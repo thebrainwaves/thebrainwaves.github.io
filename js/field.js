@@ -207,9 +207,11 @@
   if (!F) { var c2 = cv; cv = document.createElement('canvas'); cv.className = 'field'; cv.setAttribute('aria-hidden', 'true'); hero.replaceChild(cv, c2); F = init2D(); }
   if (!F) return;
   document.documentElement.dataset.field = F.kind;
-  var hr = measure(); if (!hr) return;
-  F.resize(hr);
-  F.draw(performance.now());
+  // the hero can start hidden (deep link to a view): wait until it is shown, then size + draw
+  var booted = false;
+  function boot() { if (booted) return true; var hr = measure(); if (!hr) return false; booted = true; F.resize(hr); F.draw(performance.now()); return true; }
+  boot();
+  document.addEventListener('bh:view', function () { if (boot()) { var r = measure(); if (r) { F.resize(r); F.draw(performance.now()); } } if (!reduce) start(); });
   var rt = 0;
   window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { var r = measure(); if (r) { F.resize(r); F.draw(performance.now()); } }, 150); });
   window.matchMedia('(max-width: 720px)').addEventListener('change', function () { setTimeout(function () { var r = measure(); if (r) { F.resize(r); F.draw(performance.now()); } }, 60); });
@@ -243,7 +245,7 @@
     F.draw(now);
     if (visible && !document.hidden) raf = requestAnimationFrame(frame);
   }
-  function start() { if (!raf && visible && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+  function start() { if (!booted) return; if (!raf && visible && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); } }
   if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { visible = es[0].isIntersecting; visible ? start() : (raf && cancelAnimationFrame(raf), raf = 0); }).observe(hero);
   document.addEventListener('visibilitychange', function () { document.hidden ? (raf && cancelAnimationFrame(raf), raf = 0) : start(); });
   start();

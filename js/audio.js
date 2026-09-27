@@ -162,6 +162,8 @@
     lvlS += (Math.min(1, rms * 5) - lvlS) * .25;
     var A = window.BH_audio; A.on = true; A.bass = bassS; A.level = lvlS; A.raw = raw;
     if (svg) { svg.classList.add('au-on'); svg.style.setProperty('--au', lvlS.toFixed(3)); svg.style.setProperty('--ab', bassS.toFixed(3)); }
+    // the same values on <html>: on the other views (brain hidden) the top bar's signal line and the view marker breathe with the track
+    root.style.setProperty('--au', lvlS.toFixed(3)); root.style.setProperty('--ab', bassS.toFixed(3));
     // kick / transient: bass jumps clearly above its running average; at most ~1.5 per second
     A.kick *= .85;
     if (dev > .055 && fast > .3 && now - lastKick > 650) {
@@ -169,12 +171,17 @@
       var amt = Math.min(.34, .14 + dev * 1.2);
       if (window.BH_flare && heroOn()) window.BH_flare(amt, PAL[Math.floor(Math.random() * PAL.length)]); // only while the brain is on screen, so reading further down stays calm
       if (window.BH_fire) window.BH_fire(REG[Math.floor(Math.random() * REG.length)]);
+      if (!heroOn()) { root.classList.remove('au-kick'); void root.offsetWidth; root.classList.add('au-kick'); clearTimeout(kickT); kickT = setTimeout(function () { root.classList.remove('au-kick'); }, 220); }
     }
   }
   function rest() {
     var A = window.BH_audio; A.on = false; A.bass = A.level = A.kick = 0; slow = fast = bassS = lvlS = 0;
     if (svg) { svg.classList.remove('au-on'); svg.style.removeProperty('--au'); svg.style.removeProperty('--ab'); }
+    root.style.removeProperty('--au'); root.style.removeProperty('--ab'); root.classList.remove('au-kick');
   }
+  var kickT = 0;
+  // views (js/router.js): the waveform canvas may have been hidden at load, so redraw it when a view is shown
+  document.addEventListener('bh:view', function () { requestAnimationFrame(function () { updateTime(); drawWave(); }); });
   function start() { if (!raf) raf = requestAnimationFrame(tick); }
   audio.addEventListener('play', function () { sync(); start(); });
   audio.addEventListener('playing', sync);

@@ -1,6 +1,6 @@
 /* Brainhertz: scroll / navigation flares.
    A brief datamosh burst (colour bands that smear sideways, RGB-split slivers, macroblocks and a light bloom sweep)
-   fires as you move through the site, scaled by scroll velocity, stronger when a new section arrives, then settles.
+   fires as you move through the site, scaled by scroll velocity, stronger when a new view opens (js/router.js), then settles.
    Idle cost is zero: the canvas only animates while a flare is decaying. Off entirely under prefers-reduced-motion. */
 (function () {
   'use strict';
@@ -77,20 +77,12 @@
     });
   }, { passive: true });
 
-  // a new section arriving -> full flare in that section's colour + a short saturation / RGB-split hit on the section
-  var ready = false, lastHit = 0;
-  setTimeout(function () { ready = true; }, 800);
+  // a new view arriving (js/router.js) -> full flare in that view's colour + a short saturation / RGB-split hit on the section
   function rgbOf(el) { var v = getComputedStyle(el).getPropertyValue('--rc-rgb').trim().split(/\s+/); return v.length === 3 ? 'rgb(' + v.join(',') + ')' : null; }
-  if ('IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) {
-        if (!e.isIntersecting || !ready || mq.matches) return;
-        var now = performance.now(); if (now - lastHit < 450) return; lastHit = now;
-        flare(1, rgbOf(e.target));
-        var t = e.target; t.classList.remove('flare-hit'); void t.offsetWidth; t.classList.add('flare-hit');
-        setTimeout(function () { t.classList.remove('flare-hit'); }, 700);
-      });
-    }, { rootMargin: '-38% 0px -58% 0px' });
-    document.querySelectorAll('main section[id], body > section[id], .section[id]').forEach(function (s) { if (s.id !== 'hero') io.observe(s); });
-  }
+  window.BH_sectionHit = function (t, amount) {
+    if (!t || mq.matches || window.BH_noFlare) return;
+    flare(amount == null ? 1 : amount, rgbOf(t));
+    t.classList.remove('flare-hit'); void t.offsetWidth; t.classList.add('flare-hit');
+    setTimeout(function () { t.classList.remove('flare-hit'); }, 700);
+  };
 })();

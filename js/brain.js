@@ -76,8 +76,8 @@
     t.setAttribute('text-anchor', n.dataset.anchor);
     Array.prototype.forEach.call(t.querySelectorAll('tspan'), function (ts) { ts.setAttribute('x', n.dataset.lx); });
     var label = n.querySelector('.nl-main').textContent;
-    n.setAttribute('aria-label', label + ': look inside');
-    n.setAttribute('aria-haspopup', 'dialog'); n.setAttribute('aria-expanded', 'false'); n.setAttribute('aria-controls', 'cell');
+    n.setAttribute('aria-label', label + ': go to this section (focus or hover shows a preview)');
+    n.setAttribute('aria-expanded', 'false'); n.setAttribute('aria-controls', 'cell');
     var col = COLORS[r] || '#1fb6ff', gid = 'g-region-' + r;
     var rg = el('radialGradient', { id: gid }, svg.querySelector('defs'));
     el('stop', { offset: 0, 'stop-color': col, 'stop-opacity': .6 }, rg);
@@ -211,6 +211,7 @@
 
   // ---------- click: fire, then travel ----------
   function go(id) {
+    if (window.BH_route) { window.BH_route(id); return; } // views: js/router.js shows one section at a time
     var t = document.getElementById(id); if (!t) return;
     if (window.BH_flare && nodes[id]) window.BH_flare(.9, nodes[id].color);
     t.scrollIntoView({ behavior: reduce.matches ? 'auto' : 'smooth', block: 'start' });
@@ -224,7 +225,7 @@
     if (reduce.matches || !heroVisible()) { go(region); return; }
     fire(region, 1);
     if (window.BH_flare) window.BH_flare(1, nodes[region] && nodes[region].color);
-    setTimeout(function () { go(region); }, 520);
+    setTimeout(function () { go(region); }, 380);
   }
   // mobile chain = direct navigation (fires a signal first)
   document.querySelectorAll('.chain a[data-region]').forEach(function (a) {
@@ -344,11 +345,10 @@
     n.addEventListener('click', function (ev) {
       if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button > 0) return;
       ev.preventDefault();
-      clearTimeout(openT);
-      if (state.open && state.pinned && state.region === r) { closeCell(false); fireAndGo(r); return; }
-      if (!reduce.matches) fire(r, 0);
-      var keyboard = ev.detail === 0;
-      openCell(r, { pinned: true, focus: keyboard || mobile.matches });
+      clearTimeout(openT); clearTimeout(closeT);
+      // the brain is the site map: a click travels straight to that region's view (hover still previews)
+      if (state.open) closeCell(false);
+      fireAndGo(r);
     });
   });
 

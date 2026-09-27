@@ -46,14 +46,7 @@
     revealables.forEach(function (e) { io.observe(e); });
   }
 
-  // spine: active section
-  var spineLinks = document.querySelectorAll('.spine a');
-  if ('IntersectionObserver' in window) {
-    var so = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { if (e.isIntersecting) spineLinks.forEach(function (a) { a.classList.toggle('active', a.dataset.spine === e.target.id); }); });
-    }, { rootMargin: '-45% 0px -50% 0px' });
-    ['hero', 'about', 'disciplines', 'artist', 'work', 'plugins', 'contact'].forEach(function (id) { var t = document.getElementById(id); if (t) so.observe(t); });
-  }
+  // spine / nav active state: handled by js/router.js (one view at a time)
 
   // top-nav: flash discipline cards when jumping to them
   document.querySelectorAll('.topnav a[data-region]').forEach(function (a) {
