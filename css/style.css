@@ -844,18 +844,3 @@ html:not(.js) .mosh-demo{display:none}
 @media (max-width:900px){.mosh-demo{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:420px){.md-row{grid-template-columns:54px minmax(0,1fr) 50px 24px;gap:6px;padding-left:10px}.md-hint{display:none}}
 .md-play .ic-pause{display:block}.md-play .ic-play{display:none}.mosh-demo.is-paused .md-play .ic-play{display:block}.mosh-demo.is-paused .md-play .ic-pause{display:none}
-
-/* ---------- AuduiO (Gumroad) card: same card as MOSH, square cover shown whole ---------- */
-.auduio-shot img{background:#000}
-.product .mosh-info{display:flex;flex-direction:column;justify-content:center}
-.product .plugin-actions{margin-top:6px}
-.buy-btn{font-size:17px;padding:15px 26px;gap:10px;align-items:center}
-.buy-btn small{font-size:14px}
-.buy-ext{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.buy-btn:focus-visible{outline:2px solid #fff;outline-offset:3px}
-@media (max-width:900px){.auduio-shot img,.plugin.product .mosh-shot img{aspect-ratio:1/1;max-height:min(78vw,420px);width:100%}}
-@media (max-width:520px){.buy-btn{width:100%;justify-content:center}}
-.cell-plugin.cp-row{display:flex;flex-wrap:nowrap;align-items:center;gap:12px}
-.cp-sq{flex:0 0 64px;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid rgb(var(--rc-rgb) / .3);background:#000}
-.cp-txt{display:grid;gap:3px;min-width:0}
-.cp-txt strong{letter-spacing:.08em}

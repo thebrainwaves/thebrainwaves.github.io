@@ -164,7 +164,7 @@
   document.addEventListener('keydown', function (ev) {
     if (ev.key !== 'Escape' || ev.defaultPrevented) return;
     if (menu && !menu.hidden) { setMenu(false); if (menuBtn) menuBtn.focus(); return; }
-    // a third-party checkout overlay (Gumroad) is open and has locked page scroll: leave the view alone
+    // a modal overlay has locked page scroll (body overflow:hidden set inline): leave the view alone
     if (document.body.style.overflow === 'hidden') return;
     var t = ev.target;
     if (t && (t.isContentEditable || (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && t.type !== 'range'))) return;
