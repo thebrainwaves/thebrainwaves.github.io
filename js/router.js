@@ -102,8 +102,17 @@
     var el = view === 'home' ? hero : views[view];
     // restart the enter animation
     el.classList.remove('view-in'); void el.offsetWidth; if (!reduce.matches && !opts.initial) el.classList.add('view-in');
-    if (r.target && r.target !== el) r.target.scrollIntoView({ block: 'start', behavior: 'auto' });
-    else window.scrollTo(0, 0);
+    if (r.target && r.target !== el) {
+      var tgt = r.target; tgt.scrollIntoView({ block: 'start', behavior: 'auto' });
+      // late layout (lazy embeds, fonts) can push the target down: re-align a few times unless the visitor has scrolled
+      var setY = window.scrollY;
+      [150, 500, 1200, 2500].forEach(function (ms) {
+        setTimeout(function () {
+          if (current !== view || Math.abs(window.scrollY - setY) > 4) return;
+          tgt.scrollIntoView({ block: 'start', behavior: 'auto' }); setY = window.scrollY;
+        }, ms);
+      });
+    } else window.scrollTo(0, 0);
     if (opts.focus) {
       var f = null;
       if (view === 'home' && prev && prev !== 'home' && opts.fromKey) f = document.querySelector('.node[data-region="' + REGION[prev] + '"]');
