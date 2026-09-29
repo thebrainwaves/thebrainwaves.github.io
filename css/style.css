@@ -798,8 +798,8 @@ html.au-kick:not([data-view="home"]) .topbar::after{filter:brightness(1.6) drop-
 /* MOSH card: the photo is the only visual; a wider left column so it matches the info block, sticky while the details are open */
 .plugin.featured{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:stretch}
 @media (min-width:901px){
-  .mosh-visual{align-self:stretch;display:block;min-height:0}
-  .mosh-shot{position:sticky;top:86px;height:100%;max-height:min(600px,calc(100vh - 110px))}
-  .mosh-shot img{height:100%;aspect-ratio:auto;object-fit:cover;object-position:50% 45%}
+  .mosh-visual{align-self:stretch;display:flex;flex-direction:column;justify-content:center;min-height:0}
+  .mosh-shot{position:sticky;top:86px}
+  .mosh-shot img{height:auto;aspect-ratio:16/9;object-fit:contain}
 }
 @media (max-width:900px){.plugin.featured{grid-template-columns:minmax(0,1fr)}}
