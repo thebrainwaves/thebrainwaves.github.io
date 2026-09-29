@@ -328,8 +328,6 @@ h3{margin:0 0 10px;font-size:20px;letter-spacing:-.01em}
 .plugin.real{border:1px solid rgb(var(--rc-rgb) / .45);background:linear-gradient(160deg,rgba(255,138,31,.12),rgba(255,59,59,.05) 55%,rgba(255,210,31,.04));color:var(--ink)}
 .plugin.featured{grid-column:1/-1;display:grid;grid-template-columns:minmax(260px,1fr) 1.3fr;gap:26px;padding:22px}
 .mosh-visual{display:flex;flex-direction:column;gap:8px}
-.rd-canvas{width:100%;aspect-ratio:16/9;height:auto;border-radius:14px;border:1px solid rgb(var(--rc-rgb) / .25);background:#05060d;image-rendering:pixelated;box-shadow:0 20px 60px -26px rgba(255,138,31,.7)}
-.rd-note{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin:0}
 .plat.real{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border-radius:999px;border:1px solid rgb(var(--rc-rgb) / .35);color:rgb(var(--rc-rgb))}
 .new-tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--bg);background:linear-gradient(90deg,var(--rd),var(--or));padding:3px 8px;border-radius:4px}
 .plugin.real h3{font-size:34px;letter-spacing:.08em;margin:4px 0 8px;color:var(--ink)}
@@ -793,8 +791,15 @@ html.au-kick:not([data-view="home"]) .topbar::after{filter:brightness(1.6) drop-
 .cf-links a.cf-sp{color:#04050c;background:linear-gradient(90deg,#2bff88,#22e4ff);border-color:transparent}
 
 /* ---------- MOSH: real output frame ---------- */
-.mosh-shot{margin:0 0 12px;position:relative}
+.mosh-shot{margin:0;position:relative}
 .mosh-shot img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:14px;border:1px solid rgb(var(--rc-rgb) / .35);box-shadow:0 20px 60px -26px rgba(255,138,31,.7);background:#05060d}
 .mosh-shot figcaption{position:absolute;left:10px;bottom:10px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:6px;background:rgba(4,5,12,.78);color:#fff4c9}
-.rd-canvas.rd-small{width:48%;box-shadow:none}
 .cp-thumb{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:10px;border:1px solid rgb(var(--rc-rgb) / .3);margin:0 0 6px}
+/* MOSH card: the photo is the only visual; a wider left column so it matches the info block, sticky while the details are open */
+.plugin.featured{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:stretch}
+@media (min-width:901px){
+  .mosh-visual{align-self:stretch;display:block;min-height:0}
+  .mosh-shot{position:sticky;top:86px;height:100%;max-height:min(600px,calc(100vh - 110px))}
+  .mosh-shot img{height:100%;aspect-ratio:auto;object-fit:cover;object-position:50% 45%}
+}
+@media (max-width:900px){.plugin.featured{grid-template-columns:minmax(0,1fr)}}
