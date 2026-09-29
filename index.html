@@ -27,7 +27,7 @@
   <link rel="stylesheet" href="css/style.css">
   <script>/* views (js/router.js): pick the view before first paint so deep links never flash the map */
   (function (d) { d.classList.add('js'); var h = location.hash.slice(1), V = ['about','visuals','sound','artist','live','lab','work','plugins','contact'],
-    A = { lighting: 'live', direction: 'about', mosh: 'plugins', track: 'artist', 'music-video': 'artist' };
+    A = { lighting: 'live', direction: 'about', mosh: 'plugins', auduio: 'plugins', track: 'artist', 'music-video': 'artist' };
     d.setAttribute('data-view', V.indexOf(h) > -1 ? h : (A[h] || 'home')); })(document.documentElement);</script>
 </head>
 <body>
@@ -253,6 +253,7 @@
     <h3 id="cell-title">Plugins</h3>
     <div class="cell-plugins">
       <div class="cell-plugin real"><img class="cp-thumb" src="assets/plugins/mosh-preview-thumb.webp" alt="MOSH datamosh effect running in Resolume" width="320" height="180"><strong>MOSH</strong><span class="cp-plat">Resolume FFGL · Windows 64-bit</span><span class="cp-desc">Reaction-diffusion datamosh effect for Resolume Arena / Avenue 7.0.3 to 7.2.x.</span><a class="cp-dl" href="assets/plugins/MOSH-resolume-7.2.zip" download>Download .zip</a></div>
+      <div class="cell-plugin real cp-row"><img class="cp-sq" src="assets/plugins/auduio-cover-thumb.webp" alt="AuduiO cover art: a glitched, blocky shape on a black background with the words HALLOWEEN and Tellavi5ion" width="360" height="360"><div class="cp-txt"><strong>AuduiO</strong><span class="cp-plat">Digital product · $50</span><a class="cp-dl" href="https://brainhertz.gumroad.com/l/auduio" target="_blank" rel="noopener">Buy on Gumroad</a></div></div>
     </div>
   </template>
   <template id="tpl-visuals">
@@ -650,7 +651,7 @@
   <header class="sec-head">
     <p class="region-tag"><span class="rt-dot"></span>Motor cortex · Plugins</p>
     <h2 id="plugins-title">Plugins for <span class="grad">the signal chain</span></h2>
-    <p class="sec-sub">Brainhertz plugins, devices, components and presets. First release: <strong>MOSH</strong> for Resolume.</p>
+    <p class="sec-sub">Brainhertz plugins, devices, components and presets: <strong>MOSH</strong>, a free datamosh effect for Resolume, and <strong>AuduiO</strong>, on Gumroad.</p>
   </header>
   <div class="plugin-grid">
     <article class="plugin real featured" id="mosh" aria-labelledby="mosh-title">
@@ -692,6 +693,26 @@
           <p class="md-cap"><strong id="md-cap-title">Live preview, try the controls.</strong> Click or drag on it to seed the reaction. A browser sketch of the effect using Kyle's frame as the clip, not the plugin itself.</p>
         </div>
         <div class="md-panel" aria-labelledby="md-title"></div>
+      </div>
+    </article>
+    <article class="plugin real featured product" id="auduio" aria-labelledby="auduio-title">
+      <div class="mosh-visual">
+        <figure class="mosh-shot auduio-shot">
+          <img src="assets/plugins/auduio-cover.webp" alt="AuduiO cover art: a glitched, blocky shape on a black background with the words HALLOWEEN and Tellavi5ion" width="944" height="944" loading="lazy" decoding="async">
+          <figcaption>AuduiO cover</figcaption>
+        </figure>
+      </div>
+      <div class="mosh-info">
+        <div class="plugin-top"><span class="plat real">Digital product · Gumroad</span></div>
+        <h3 id="auduio-title">AuduiO</h3>
+        <p class="mosh-desc">An Audio Interface designed for live performers to make their dreams come true on the fly.</p>
+        <dl class="mosh-spec">
+          <div><dt>Price</dt><dd>$50</dd></div>
+          <div><dt>Currency</dt><dd>USD</dd></div>
+          <div><dt>Sold by</dt><dd>Kyle Carlin</dd></div>
+          <div><dt>Checkout</dt><dd>Gumroad</dd></div>
+        </dl>
+        <div class="plugin-actions"><a class="btn real-btn buy-btn" href="https://brainhertz.gumroad.com/l/auduio" target="_blank" rel="noopener">Buy on Gumroad <small>$50</small><svg class="buy-ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="sr"> (opens Gumroad in a new tab)</span></a></div>
       </div>
     </article>
   </div>
@@ -743,6 +764,7 @@
 <script src="js/brain.js" defer></script>
 <script src="js/main.js" defer></script>
 <script src="js/mosh-demo.js" defer></script>
+<script src="https://gumroad.com/js/gumroad.js" async></script>
 <script src="js/field.js" defer></script>
 <script src="js/flare.js" defer></script>
 <script src="js/audio.js" defer></script>
