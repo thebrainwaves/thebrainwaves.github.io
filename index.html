@@ -15,12 +15,12 @@
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="The Brainhertz Productions homepage: a clear glass brain filled with a colourful datamosh pattern, labelled brain regions, and the Brainhertz Productions wordmark.">
+  <meta property="og:image:alt" content="The Brainhertz Productions homepage: the Brainhertz Productions name over a colourful datamosh pattern, with Book lighting / visuals and Listen to ICHANNEL2 buttons.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Brainhertz Productions">
   <meta name="twitter:description" content="Producer and director. Visuals, music, projection mapping and lighting design. Los Angeles, since 2016.">
   <meta name="twitter:image" content="https://brainhertzproductions.com/assets/og-image.jpg">
-  <meta name="twitter:image:alt" content="The Brainhertz Productions homepage: a clear glass brain filled with a colourful datamosh pattern, labelled brain regions, and the Brainhertz Productions wordmark.">
+  <meta name="twitter:image:alt" content="The Brainhertz Productions homepage: the Brainhertz Productions name over a colourful datamosh pattern, with Book lighting / visuals and Listen to ICHANNEL2 buttons.">
   <link rel="canonical" href="https://brainhertzproductions.com/">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
@@ -47,31 +47,18 @@
   <button type="button" class="menu-btn" aria-expanded="false" aria-controls="sitemap-menu"><span class="mb-bars" aria-hidden="true"><i></i><i></i><i></i></span><span class="mb-label">Menu</span></button>
   <nav class="topnav" aria-label="Primary">
     <ul>
-      <li><a href="#about" data-region="about">About</a></li>
-      <li><a href="#visuals" data-region="visuals">Visuals</a></li>
-      <li><a href="#sound" data-region="sound">Sound</a></li>
-      <li><a href="#artist" data-region="sound">Artist</a></li>
-      <li><a href="#live" data-region="live">Live</a></li>
-      <li><a href="#lab" data-region="lab">Lab</a></li>
       <li><a href="#work" data-region="work">Work</a></li>
-      <li><a href="#plugins" data-region="plugins">Plugins</a></li>
-      <li><a href="#contact" data-region="contact" class="nav-cta">Contact</a></li>
+      <li><a href="#artist" data-region="sound">Music</a></li>
+      <li><a href="#contact" data-region="contact" class="nav-cta">Hire</a></li>
     </ul>
   </nav>
 </header>
 <!-- site-map menu (small screens; opened by .menu-btn) -->
-<nav class="sitemap-menu" id="sitemap-menu" aria-label="Site map" hidden>
+<nav class="sitemap-menu" id="sitemap-menu" aria-label="Menu" hidden>
   <ol>
-    <li><a href="#map" data-region="home"><span class="sm-dot" aria-hidden="true"></span>Map (home)</a></li>
-    <li><a href="#about" data-region="about"><span class="sm-dot" aria-hidden="true"></span>About</a></li>
-    <li><a href="#visuals" data-region="visuals"><span class="sm-dot" aria-hidden="true"></span>Visuals</a></li>
-    <li><a href="#sound" data-region="sound"><span class="sm-dot" aria-hidden="true"></span>Music &amp; Sound</a></li>
-    <li><a href="#artist" data-region="sound"><span class="sm-dot" aria-hidden="true"></span>Artist: Tellavi5ion</a></li>
-    <li><a href="#live" data-region="live"><span class="sm-dot" aria-hidden="true"></span>Live, Projection &amp; Lighting</a></li>
-    <li><a href="#lab" data-region="lab"><span class="sm-dot" aria-hidden="true"></span>Real-time Lab</a></li>
     <li><a href="#work" data-region="work"><span class="sm-dot" aria-hidden="true"></span>Work</a></li>
-    <li><a href="#plugins" data-region="plugins"><span class="sm-dot" aria-hidden="true"></span>Plugins</a></li>
-    <li><a href="#contact" data-region="contact"><span class="sm-dot" aria-hidden="true"></span>Contact</a></li>
+    <li><a href="#artist" data-region="sound"><span class="sm-dot" aria-hidden="true"></span>Music</a></li>
+    <li><a href="#contact" data-region="contact"><span class="sm-dot" aria-hidden="true"></span>Hire</a></li>
   </ol>
 </nav>
 
@@ -99,10 +86,20 @@
     <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span>Los Angeles · Since 2016</p>
     <h1 id="hero-title">Brainhertz <span class="grad">Productions</span></h1>
     <p class="lede">Producer &amp; director. Visuals, music, projection mapping and lighting design: one production camp, wired together.</p>
+    <!-- CLIP HOOK (hero clip, not in use yet): for a 15s muted autoplay clip, drop the file in assets/video/, remove "hidden" below and fill in the <video>:
+      <video class="hc-video" src="assets/video/hero-clip.mp4" poster="assets/video/hero-clip.webp" autoplay muted loop playsinline preload="metadata" aria-label="Short clip of Brainhertz live visuals"></video>
+      <button type="button" class="hc-unmute" aria-pressed="false">Sound on</button>   (optional: js/main.js wires it up if it is present)
+    -->
+    <div class="hero-clip" id="hero-clip" hidden></div>
+    <div class="hero-cta">
+      <a class="cta-book" href="mailto:brainhertzproductions@gmail.com?subject=Booking&amp;body=Show%20night%0D%0A%0D%0AMapping%20day%0D%0A%0D%0ARemote%20Resolume%20program%0D%0A%0D%0A">Book lighting / visuals</a>
+      <a class="cta-listen" href="https://open.spotify.com/album/369DozWzfZtHWWhbTBDpkk" rel="noopener" target="_blank">Listen to ICHANNEL2<span class="sr"> (opens Spotify in a new tab)</span></a>
+    </div>
+    <p class="cta-more"><a href="#plugins">Free MOSH plugin for Resolume <span aria-hidden="true">&rarr;</span></a></p>
     <p class="credit-line"><span class="cl-mark" aria-hidden="true"></span><span>Immersive experiences · projection mapping · live sound</span></p>
     <a class="badge badge-link" href="https://lasiggraph.org/bio/presenter/carlin-kyle" rel="noopener" target="_blank" aria-label="Co-Chair, LASIGGRAPH: Kyle Carlin's bio on lasiggraph.org (opens in a new tab)"><span class="badge-dot" aria-hidden="true"></span>Co-Chair, LASIGGRAPH<svg class="ext-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-    <p class="hint" aria-hidden="true"><span class="hint-desktop">This brain is the site map. Hover a neuron to look inside; click it to go there.</span><span class="hint-mobile">This brain is the site map. Tap a neuron to go there.</span></p>
   </div>
+  <p class="hint toy-hint" aria-hidden="true"><span class="hint-desktop">Or play with the brain: hover a neuron to look inside, click it to go there.</span><span class="hint-mobile">Or play with the brain: tap a neuron to go there.</span></p>
 
   <div class="brain-wrap">
     <svg class="brain" id="brain" viewBox="0 0 1000 720" role="group" aria-labelledby="brain-title brain-desc">
@@ -274,7 +271,6 @@
       <p class="cf-meta">Single · 2 tracks · Sep 24, 2026</p>
       <p class="cf-links"><a class="cf-sp" href="https://open.spotify.com/album/369DozWzfZtHWWhbTBDpkk" rel="noopener" target="_blank">Listen on Spotify</a><a href="https://music.apple.com/us/album/ichannel2-single/6815667056" rel="noopener" target="_blank">Apple Music</a></p>
     </div>
-    <ul class="cell-chips"><li>Ableton Live</li><li>Sound design</li><li>Composition</li><li>Live sound</li></ul>
     <div class="cell-now">
       <button type="button" class="np-btn" data-bh-play aria-pressed="false" aria-label="Play Ghosts N Goblins by TellaVi5ion"><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z"/></svg></button>
       <span class="np-text"><span class="np-k"><span class="np-off">New track · unreleased</span><span class="np-on">Now playing</span></span><b>Ghosts N Goblins</b></span>
@@ -295,19 +291,13 @@
   <template id="tpl-live">
     <p class="cell-lobe">Parietal lobe · space</p>
     <h3 id="cell-title">Live, Projection &amp; Lighting</h3>
-    <ul class="cell-list">
-      <li><span class="cl-dot"></span><span><b>Immersive &amp; VR</b><small>an early fully immersive experience · VR tech for a major LA tour</small></span></li>
-      <li><span class="cl-dot"></span><span><b>NEXT LEVEL: One Love Pre-Party</b><small>Oct 7, 2017 · Fais Do Do, Los Angeles · projections</small></span></li>
-      <li><span class="cl-dot"></span><span><b>NEXT LEVEL: Scorpio Rising</b><small>Nov 4, 2017 · Purple 33, Marina del Rey · live visuals</small></span></li>
-      <li><span class="cl-dot"></span><span><b>Noodlefest</b><small>Audio visuals</small></span></li>
-    </ul>
-    <ul class="cell-chips"><li>Projection mapping</li><li>Lighting design</li><li>Resolume</li><li>TouchDesigner</li></ul>
+    <p>Live shows run through Resolume, projection mapping, stage setup, art installations and lighting design.</p>
+    <p class="cell-more"><a href="#work">Live &amp; event credits in Work <span aria-hidden="true">&rarr;</span></a></p>
   </template>
   <template id="tpl-lab">
     <p class="cell-lobe">Cerebellum · timing</p>
     <h3 id="cell-title">Real-time Lab</h3>
     <p><b>Tellavi5ion</b>: a generative music and visual system for real-time performance, combining generative music, real-time visuals and immersive lighting.</p>
-    <ul class="cell-chips"><li>Ableton</li><li>Unreal Engine</li><li>Open to collaborators</li></ul>
   </template>
   <template id="tpl-work">
     <p class="cell-lobe">Hippocampus · memory</p>
@@ -362,11 +352,7 @@
       <p>Kyle is Co-Chair of <a href="https://lasiggraph.org/bio/presenter/carlin-kyle" rel="noopener" target="_blank">LASIGGRAPH</a>, the Los Angeles chapter of ACM SIGGRAPH. He likes sharing what he builds: <a href="#mosh">MOSH</a>, his datamosh plugin for Resolume, is a free download. If you are working on something and want to talk shop, he is always glad to hear from you: <a href="#contact">send a signal</a>.</p>
     </div>
     <aside class="toolkit" aria-labelledby="toolkit-title">
-      <h3 id="toolkit-title">Toolkit</h3>
-      <ul class="tags">
-        <li>Cinema 4D</li><li>After Effects</li><li>Photoshop</li><li>Premiere</li><li>Ableton Live</li>
-        <li>TouchDesigner</li><li>Resolume</li><li>Notch</li><li>Smode</li><li>Unreal Engine</li>
-      </ul>
+      <h3 id="toolkit-title">At a glance</h3>
       <dl class="facts">
         <div><dt>Based</dt><dd>Los Angeles, California</dd></div>
         <div><dt>Active since</dt><dd>2016</dd></div>
@@ -396,7 +382,6 @@
       <p class="disc-lobe">Occipital · sight</p>
       <h3>Visuals &amp; Animation</h3>
       <p>3D animation designed for other artists in Cinema 4D, composited in After Effects. Visual direction and motion work built around each artist's needs.</p>
-      <ul class="mini"><li>Cinema 4D</li><li>After Effects</li><li>Photoshop</li><li>Premiere</li></ul>
     </article>
     <div class="view-thumbs">
       <img src="assets/work/render-02.jpg" alt="3D render: green and violet angular panels around a magenta sphere" loading="lazy" width="1200" height="675">
@@ -436,7 +421,6 @@
       <p>Music composition and sound design in Ableton Live, from a background in bands, recording and live performance.</p>
       <p>Has done live sound for many artists in the industry, and sets up full sound systems.</p>
       <p class="studio">Out now as Tellavi5ion: <strong>ICHANNEL2</strong> (single, Sep 24, 2026) and the album <strong>Channel One</strong>. <a class="disc-link" href="#artist">Artist page &amp; streaming <span aria-hidden="true">&rarr;</span></a></p>
-      <ul class="mini"><li>Ableton Live</li><li>Sound design</li><li>Composition</li><li>Live sound</li><li>Sound systems</li></ul>
     </article>
     <div class="view-side">
       <div class="cell-now view-now">
@@ -545,7 +529,6 @@
       <p class="disc-lobe">Parietal · space</p>
       <h3>Live Visuals &amp; Projection Mapping</h3>
       <p>Live shows run through Resolume, projection mapping with Resolume and TouchDesigner, stage setup and art installations.</p>
-      <ul class="mini"><li>Resolume</li><li>TouchDesigner</li><li>Projection mapping</li></ul>
     </article>
     <article class="disc" id="lighting" tabindex="-1" data-region="live">
       <p class="disc-lobe">Parietal · light</p>
@@ -554,17 +537,7 @@
       <ul class="mini"><li>Lighting design</li><li>Live shows</li></ul>
     </article>
   </div>
-  <div class="view-credits">
-    <h3>Selected live &amp; event work</h3>
-    <ul class="cell-list">
-      <li><span class="cl-dot"></span><span><b>Immersive &amp; VR</b><small>an early fully immersive experience · VR tech for a major LA tour</small></span></li>
-      <li><span class="cl-dot"></span><span><b>NEXT LEVEL: One Love Pre-Party</b><small>Oct 7, 2017 · Fais Do Do, Los Angeles · projections</small></span></li>
-      <li><span class="cl-dot"></span><span><b>NEXT LEVEL: Scorpio Rising</b><small>Nov 4, 2017 · Purple 33, Marina del Rey · live visuals</small></span></li>
-      <li><span class="cl-dot"></span><span><b>Noodlefest</b><small>Audio visuals</small></span></li>
-    </ul>
-    <ul class="mini"><li>Projection mapping</li><li>Lighting design</li><li>Resolume</li><li>TouchDesigner</li></ul>
-  </div>
-  <p class="view-more"><a href="#work">Full credits timeline in Work <span aria-hidden="true">&rarr;</span></a></p>
+  <p class="view-more"><a href="#work">Live &amp; event credits are in Work <span aria-hidden="true">&rarr;</span></a></p>
 </section>
 
 <!-- ============ REAL-TIME LAB (cerebellum, green) ============ -->
@@ -573,17 +546,12 @@
     <p class="region-tag"><span class="rt-dot"></span>Cerebellum · Real-time Lab</p>
     <h2 id="lab-title">Real-time <span class="grad">lab</span></h2>
   </header>
-  <div class="view-split">
+  <div class="view-cards">
     <article class="disc" data-region="lab">
       <p class="disc-lobe">Cerebellum · timing</p>
       <h3>Real-time Lab</h3>
-      <p>Real-time and generative systems. The current project, <strong>Tellavi5ion</strong>, is a generative music and visual system for performance that combines generative music, real-time visuals and immersive lighting. Collaborators working in Ableton and Unreal are welcome.</p>
-      <ul class="mini"><li>Unreal Engine</li><li>Notch</li><li>Smode</li><li>Generative systems</li></ul>
+      <p>Real-time and generative systems. The current project, <strong>Tellavi5ion</strong>, is a generative music and visual system for performance that combines generative music, real-time visuals and immersive lighting.</p>
     </article>
-    <div class="view-side">
-      <ul class="mini"><li>Ableton</li><li>Unreal Engine</li><li>Open to collaborators</li></ul>
-      <p class="view-note">Working in Ableton or Unreal and want to collaborate? <a href="#contact">Send a signal</a>.</p>
-    </div>
   </div>
 </section>
 

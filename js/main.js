@@ -83,3 +83,12 @@
   });
 
 })();
+
+/* Hero clip (not in use yet): if a muted autoplay <video class="hc-video"> and an optional .hc-unmute button are added
+   inside #hero-clip (see the CLIP HOOK comment in index.html), the button toggles sound. Does nothing otherwise. */
+(function () {
+  var box = document.getElementById('hero-clip'); if (!box) return;
+  var v = box.querySelector('video.hc-video'), b = box.querySelector('.hc-unmute'); if (!v || !b) return;
+  b.addEventListener('click', function () { v.muted = !v.muted; if (!v.muted && v.paused) v.play().catch(function () {}); b.setAttribute('aria-pressed', v.muted ? 'false' : 'true'); b.textContent = v.muted ? 'Sound on' : 'Sound off'; });
+  document.addEventListener('bh:view', function (e) { if (e.detail.view !== 'home') { v.pause(); } else if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) v.play().catch(function () {}); });
+})();
