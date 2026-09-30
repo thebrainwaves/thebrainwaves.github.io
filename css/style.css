@@ -717,6 +717,8 @@ html.au-kick:not([data-view="home"]) .topbar::after{filter:brightness(1.6) drop-
 .sm-dot{flex:none;width:14px;height:14px;margin-left:1px;border-radius:50%;background:var(--bg);border:2px solid rgb(var(--rc-rgb));box-shadow:0 0 10px rgb(var(--rc-rgb) / .5);position:relative;z-index:1}
 .sitemap-menu a.active .sm-dot{background:rgb(var(--rc-rgb))}
 .sitemap-menu a[data-region="home"] .sm-dot{border-radius:4px;transform:rotate(45deg)}
+.sitemap-menu a[href="#artist"]{padding-left:34px;font-size:15px}
+.sitemap-menu a[href="#artist"] .sm-dot{width:10px;height:10px}
 
 @media (max-width:1100px){
   .menu-btn{display:inline-flex}
@@ -842,27 +844,3 @@ html:not(.js) .mosh-demo{display:none}
 @media (max-width:900px){.mosh-demo{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:420px){.md-row{grid-template-columns:54px minmax(0,1fr) 50px 24px;gap:6px;padding-left:10px}.md-hint{display:none}}
 .md-play .ic-pause{display:block}.md-play .ic-play{display:none}.mosh-demo.is-paused .md-play .ic-play{display:block}.mosh-demo.is-paused .md-play .ic-pause{display:none}
-
-/* ---------- Homepage: booking first, the brain map underneath as an optional toy ---------- */
-.hero{grid-template-columns:minmax(0,1fr);min-height:auto;gap:0;align-items:start}
-.hero-copy{max-width:860px}
-.hero .lede{max-width:46ch}
-.hero-cta{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:2px 0 14px}
-.cta-book,.cta-listen{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 26px;border-radius:999px;font-weight:800;font-size:16px;letter-spacing:.01em;text-decoration:none;transition:background .2s,box-shadow .2s,color .2s}
-.cta-book{background:var(--yl);color:var(--bg);box-shadow:0 0 28px -6px rgba(255,210,31,.75)}
-.cta-book:hover{background:#ffe36b;box-shadow:0 0 34px -4px rgba(255,210,31,.9)}
-.cta-listen{border:2px solid var(--yl);color:var(--yl);background:rgba(4,5,12,.45)}
-.cta-listen:hover{background:rgba(255,210,31,.12);color:#ffe36b}
-.cta-book:focus-visible,.cta-listen:focus-visible,.cta-more a:focus-visible{outline:2px solid #fff;outline-offset:3px}
-.cta-more{margin:0 0 24px;font-size:15px}
-.cta-more a{color:var(--yl);font-weight:700;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:4px}
-.cta-more a:hover{color:#ffe36b}
-.toy-hint{margin:22px auto 0;text-align:center;max-width:1040px}
-.brain-wrap{max-width:1040px;margin:0 auto}
-/* hero clip slot: hidden until footage exists (see the CLIP HOOK comment in index.html) */
-.hero-clip{position:relative;max-width:640px;margin:0 0 18px;border-radius:14px;overflow:hidden;border:1px solid rgba(255,210,31,.35);background:#05060d;box-shadow:0 20px 60px -28px rgba(255,138,31,.7)}
-.hero-clip[hidden]{display:none}
-.hero-clip .hc-video{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover}
-.hero-clip .hc-unmute{position:absolute;right:10px;bottom:10px;appearance:none;cursor:pointer;font:inherit;font-weight:700;font-size:13px;padding:7px 12px;border-radius:999px;border:1px solid rgba(255,210,31,.6);background:rgba(4,5,12,.75);color:var(--yl)}
-.hero-clip .hc-unmute[aria-pressed="true"]{background:var(--yl);color:var(--bg)}
-@media (max-width:560px){.hero-cta{flex-direction:column;align-items:stretch}.cta-book,.cta-listen{width:100%}}

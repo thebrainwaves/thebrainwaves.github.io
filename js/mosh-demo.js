@@ -154,7 +154,7 @@
     im.onload = function () {
       var oc = document.createElement('canvas'); oc.width = W; oc.height = H;
       var ox = oc.getContext('2d'); ox.drawImage(im, 0, 0, W, H);
-      var d; try { d = ox.getImageData(0, 0, W, H).data; } catch (e) { return; } // file:// pages can't read image pixels: keep the fallback clip
+      var d = ox.getImageData(0, 0, W, H).data;
       for (var i = 0; i < N; i++) { clip[i * 3] = d[i * 4]; clip[i * 3 + 1] = d[i * 4 + 1]; clip[i * 3 + 2] = d[i * 4 + 2]; clipLum[i] = (0.3 * d[i * 4] + 0.59 * d[i * 4 + 1] + 0.11 * d[i * 4 + 2]) / 255; }
       hasClip = true; if (!running) render(performance.now(), false);
     };
