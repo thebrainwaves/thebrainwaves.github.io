@@ -844,3 +844,8 @@ html:not(.js) .mosh-demo{display:none}
 @media (max-width:900px){.mosh-demo{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:420px){.md-row{grid-template-columns:54px minmax(0,1fr) 50px 24px;gap:6px;padding-left:10px}.md-hint{display:none}}
 .md-play .ic-pause{display:block}.md-play .ic-play{display:none}.mosh-demo.is-paused .md-play .ic-play{display:block}.mosh-demo.is-paused .md-play .ic-pause{display:none}
+
+/* Artist page: second video under the Energy music video (native 3:2, click to play) */
+.av-extra{margin:26px 0 0}
+.av-video{display:block;width:100%;height:auto;aspect-ratio:3/2;max-height:80vh;object-fit:contain;border-radius:16px;background:#000;border:1px solid rgba(255,255,255,.08)}
+.av-extra .av-cap a{color:var(--ink);font-weight:700}
