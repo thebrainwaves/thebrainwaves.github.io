@@ -120,7 +120,7 @@
       if (f) f.focus({ preventScroll: true });
     }
     if (!opts.initial && prev !== view) {
-      if (view === 'home') { window.dispatchEvent(new Event('resize')); if (window.BH_flare) window.BH_flare(.8, 'rgb(255,210,31)'); }
+      if (view === 'home') { window.dispatchEvent(new Event('resize')); if (window.BH_flare) window.BH_flare(.8, 'rgb(180,140,255)'); }
       else if (window.BH_sectionHit) window.BH_sectionHit(views[view], 1);
     }
     document.dispatchEvent(new CustomEvent('bh:view', { detail: { view: view, prev: prev, target: r.target ? r.target.id : null } }));

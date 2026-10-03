@@ -1,7 +1,7 @@
 /* Brainhertz: living multicolour reaction-diffusion field (Gray-Scott, like Kyle's MOSH plugin).
    One low-res simulation, ping-ponged on the GPU (WebGL2) and upscaled. It is drawn bright and clipped to the glass
-   brain, and soft/dark behind the rest of the hero. Colour = spectral ramp red > orange > yellow > lime > green > cyan > blue
-   (ping-pong, never wraps through magenta/purple), driven by concentration plus a slow hue drift.
+   brain, and soft/dark behind the rest of the hero. Colour = ramp red > signal red > deep red > near-black > deep purple > purple > deep blue
+   (ping-pong; red reaches purple only through a near-black step, so no pink; the reds lean a touch orange because the brain's purple glass sits on top of this canvas), driven by concentration plus a slow hue drift.
    At rest: occasional small macroblock / slice-smear moshes (applied to the sim itself, so the scars evolve).
    Flares (js/flare.js) perturb feed/kill, re-seed and spike saturation. While the track plays, bass does the same (js/audio.js).
    Pauses off-screen and when the tab is hidden. prefers-reduced-motion: one static frame, no glitches.
@@ -14,7 +14,7 @@
   var cv = document.createElement('canvas');
   cv.className = 'field'; cv.setAttribute('aria-hidden', 'true');
   hero.insertBefore(cv, hero.firstChild);
-  var RAMP = [[255, 59, 59], [255, 138, 31], [255, 210, 31], [196, 255, 46], [43, 255, 136], [34, 228, 255], [47, 139, 255]];
+  var RAMP = [[255, 90, 40], [240, 44, 30], [170, 18, 12], [18, 8, 16], [96, 30, 200], [150, 60, 255], [52, 82, 230]];
   var DISPLAY_SCALE = 0.5, SIM_MAX = 300;
   var flare = 0, drive = 0, driveSim = 0, glitch = 0, gband = [0, 0, 0, 0], nextGlitch = performance.now() + 2500;
 
@@ -70,7 +70,7 @@
       'void main(){vec2 q=uv;if(uv.y>band.x&&uv.y<band.y)q.x-=band.z;vec2 bl=floor(uv*vec2(20.,12.));' +
       'if(h(bl)<amt){q+=(vec2(h(bl+1.),h(bl+2.))-.5)*.05;}o=texture(s,q);}';
     var DISP = '#version 300 es\nprecision highp float;uniform sampler2D s,m;uniform vec4 brain,gb;uniform float t,fl,gl;uniform vec2 res;in vec2 uv;out vec4 o;\n' +
-      'vec3 C[7]=vec3[7](vec3(1.,.231,.231),vec3(1.,.541,.122),vec3(1.,.824,.122),vec3(.769,1.,.18),vec3(.169,1.,.533),vec3(.133,.894,1.),vec3(.184,.545,1.));' +
+      'vec3 C[7]=vec3[7](vec3(1.,0.353,0.157),vec3(0.941,0.173,0.118),vec3(0.667,0.071,0.047),vec3(0.071,0.031,0.063),vec3(0.376,0.118,0.784),vec3(0.588,0.235,1.),vec3(0.204,0.322,0.902));' +
       'vec3 ramp(float x){x=clamp(x,0.,1.)*6.;int i=int(min(floor(x),5.));return mix(C[i],C[i+1],x-float(i));}' +
       'float h(vec2 q){return fract(sin(dot(q,vec2(12.9898,78.233))+gb.w)*43758.5453);}' +
       'void main(){vec2 sc=vec2(uv.x,1.-uv.y);vec2 q=sc;' +
@@ -84,7 +84,9 @@
       'float inten=mix(.15*bgf,.92,mk.r)*(1.-.72*mk.g)*(1.+.45*fl*mix(.35,1.,mk.r));' +
       'col=col*(lum*.85+edge*.35)*inten;' +
       'float g=dot(col,vec3(.3,.59,.11));col=max(mix(vec3(g),col,1.+.7*fl),0.);' +
-      'o=vec4(col,clamp(max(col.r,max(col.g,col.b))*1.1,0.,1.));}';
+      // pink guard: purple stays (hue up to ~276), anything between purple and red is pulled back to violet or red; reds drop their blue and are drawn fully opaque (dim red edges become a near-black step) so the purple glass behind can't tint them pink
+      'if(col.r>col.g&&col.b>col.g){if(col.b>=col.r)col.r=min(col.r,col.g+.6*(col.b-col.g));else col.b=min(col.b,col.g);}' +
+      'float wm=smoothstep(.12,.35,(col.r-max(col.g,col.b))/(col.r+.015));o=vec4(col,mix(clamp(max(col.r,max(col.g,col.b))*1.1,0.,1.),1.,wm));}';
     function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
     function prog(fs) { var p = gl.createProgram(), v = sh(gl.VERTEX_SHADER, VS), f = sh(gl.FRAGMENT_SHADER, fs); if (!v || !f) return null; gl.attachShader(p, v); gl.attachShader(p, f); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) return null; var u = {}; var n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (var i = 0; i < n; i++) { var a = gl.getActiveUniform(p, i); u[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); } return { p: p, u: u }; }
     var pSim = prog(SIM), pMosh = prog(MOSH), pDisp = prog(DISP);

@@ -9,10 +9,10 @@
   document.querySelectorAll('.synapse').forEach(function (box, i) {
     var s = el('svg', { viewBox: '0 0 1200 90', preserveAspectRatio: 'xMidYMid meet' }, box);
     var gid = 'g-syn-' + i, defs = el('defs', {}, s), lg = el('linearGradient', { id: gid, x1: 0, x2: 1 }, defs);
-    // warm (red-orange-yellow) and cool (blue-cyan-green) strands alternate; neither blends through purple
-    var warm = ['#ff3b3b', '#ff8a1f', '#ffd21f'], cool = ['#2f8bff', '#22e4ff', '#2bff88'], set = i % 2 ? cool : warm;
+    // warm (reds) and cool (purple-violet-lavender) strands alternate; red never blends into purple (that mix reads pink)
+    var warm = ['#ff3b3b', '#e5202f', '#b3121f'], cool = ['#8a3dff', '#a066ff', '#b48cff'], set = i % 2 ? cool : warm;
     set.forEach(function (c, k) { el('stop', { offset: k / 2, 'stop-color': c }, lg); });
-    box.style.setProperty('--rc-rgb', ['255 210 31', '34 228 255', '255 59 59', '43 255 136', '255 138 31', '47 139 255'][i % 6]);
+    box.style.setProperty('--rc-rgb', ['180 140 255', '244 242 250', '255 59 59', '160 102 255', '150 90 255', '47 107 255'][i % 6]);
     var amp = 18 + (i % 3) * 6, flip = i % 2 ? -1 : 1;
     var d = 'M0 45 C150 45 200 ' + (45 - amp * flip) + ' 300 ' + (45 - amp * flip) + ' S450 ' + (45 + amp * flip) + ' 600 45 S800 ' + (45 - amp * flip) + ' 900 ' + (45 - amp * .6 * flip) + ' S1100 45 1200 45';
     var p = el('path', { d: d, 'class': 'syn-path' }, s);
@@ -33,8 +33,8 @@
     function r() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     var pts = []; for (var i = 0; i < 36; i++) pts.push([r() * 1200, r() * 240]);
     pts.forEach(function (a, i) {
-      pts.slice(i + 1).forEach(function (b) { if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 150) el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'rgba(255,210,31,.13)' }, s); });
-      el('circle', { cx: a[0], cy: a[1], r: 1.9, fill: ['#ff3b3b', '#ff8a1f', '#ffd21f', '#2bff88', '#22e4ff', '#2f8bff'][i % 6] }, s);
+      pts.slice(i + 1).forEach(function (b) { if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 150) el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'rgba(180,140,255,.13)' }, s); });
+      el('circle', { cx: a[0], cy: a[1], r: 1.9, fill: ['#ff3b3b', '#8a3dff', '#b48cff', '#a066ff', '#f2c94c', '#2f6bff'][i % 6] }, s);
     });
   }
 

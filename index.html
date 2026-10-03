@@ -97,7 +97,7 @@
 <section class="hero" id="hero" aria-labelledby="hero-title">
   <div class="hero-copy">
     <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span>Los Angeles · Since 2016</p>
-    <h1 id="hero-title">Brainhertz <span class="grad">Productions</span></h1>
+    <h1 id="hero-title"><span class="h3-word" data-text="Brainhertz">Brainhertz</span> <span class="h3-word" data-text="Productions">Productions</span></h1>
     <p class="lede">Producer &amp; director. Visuals, music, projection mapping and lighting design: one production camp, wired together.</p>
     <p class="credit-line"><span class="cl-mark" aria-hidden="true"></span><span>Immersive experiences · projection mapping · live sound</span></p>
     <a class="badge badge-link" href="https://lasiggraph.org/bio/presenter/carlin-kyle" rel="noopener" target="_blank" aria-label="Co-Chair, LASIGGRAPH: Kyle Carlin's bio on lasiggraph.org (opens in a new tab)"><span class="badge-dot" aria-hidden="true"></span>Co-Chair, LASIGGRAPH<svg class="ext-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
@@ -110,18 +110,18 @@
       <desc id="brain-desc">A clear glass brain. This is the site map. Each labelled region shows a preview on hover and goes to that part of the site on click: About, Plugins, Visuals, Music and Sound, Live, Projection and Lighting, Real-time Lab, Work and Contact.</desc>
       <defs>
         <radialGradient id="g-glass" cx="38%" cy="32%" r="75%">
-          <stop offset="0" stop-color="#eaf6ff" stop-opacity=".16"/>
-          <stop offset=".55" stop-color="#1fb6ff" stop-opacity=".05"/>
-          <stop offset="1" stop-color="#ffd21f" stop-opacity=".09"/>
+          <stop offset="0" stop-color="#f4f0ff" stop-opacity=".16"/>
+          <stop offset=".55" stop-color="#ffffff" stop-opacity=".02"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity=".06"/>
         </radialGradient>
         <linearGradient id="g-rim" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ffd21f"/>
-          <stop offset=".22" stop-color="#ff8a1f"/>
-          <stop offset=".42" stop-color="#ff3b3b"/>
-          <stop offset=".5" stop-color="#fff4d6"/>
-          <stop offset=".58" stop-color="#22e4ff"/>
-          <stop offset=".78" stop-color="#2f8bff"/>
-          <stop offset="1" stop-color="#2bff88"/>
+          <stop offset="0" stop-color="#b48cff"/>
+          <stop offset=".3" stop-color="#7a2cff"/>
+          <stop offset=".3" stop-color="#ff3b3b"/>
+          <stop offset=".58" stop-color="#c8102e"/>
+          <stop offset=".58" stop-color="#a066ff"/>
+          <stop offset=".85" stop-color="#8a3dff"/>
+          <stop offset="1" stop-color="#2f6bff"/>
         </linearGradient>
         <filter id="f-glow" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="6" result="b"/>
@@ -140,7 +140,7 @@
       </defs>
 
       <!-- ambient back-glow -->
-      <ellipse cx="500" cy="340" rx="360" ry="230" fill="#ffb800" opacity=".08" filter="url(#f-soft)"/>
+      <ellipse cx="500" cy="340" rx="360" ry="230" fill="#5a3dff" opacity=".05" filter="url(#f-soft)"/>
 
       <!-- glass body -->
       <g class="glass">
@@ -753,5 +753,6 @@
 <script src="js/flare.js" defer></script>
 <script src="js/audio.js" defer></script>
 <script src="js/router.js" defer></script>
+<script src="js/hero3d.js" defer></script>
 </body>
 </html>

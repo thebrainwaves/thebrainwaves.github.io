@@ -3,8 +3,8 @@
    can get a feel for the effect. It uses the parameter names from the MOSH README; the mapping is an approximation in
    canvas2D at 192x108, not the plugin itself. Kyle's MOSH output frame is used as the "clip" (dry signal).
    Pauses when off-screen, when the Plugins view is hidden, or when the tab is hidden. Starts paused under
-   prefers-reduced-motion. Colours: a spectral ramp (red > orange > yellow > lime > green > cyan > blue) that never
-   wraps blue back to red, plus a final guard that neutralises any purple mix, so nothing pink/magenta/purple appears. */
+   prefers-reduced-motion. Colours: a ramp (red > crimson > near-black > deep purple > purple > violet > a little deep blue) that never
+   wraps blue back to red, plus a final guard that lets purple through but pulls any pink / magenta mix back to violet or red. */
 (function () {
   'use strict';
   var root = document.getElementById('mosh-demo'); if (!root) return;
@@ -75,7 +75,7 @@
   function alive() { var m = 0; for (var i = 0; i < N; i += 7) if (B[i] > m) m = B[i]; return m > 0.08; }
 
   // ---------- colour ----------
-  var RAMP = [[255, 59, 59], [255, 138, 31], [255, 210, 31], [196, 255, 46], [43, 255, 136], [34, 228, 255], [47, 139, 255]];
+  var RAMP = [[255, 70, 50], [235, 35, 35], [170, 16, 20], [18, 8, 16], [96, 30, 200], [150, 60, 255], [52, 82, 230]];
   function ramp(t, o) { // t in 0..1; never interpolates blue back to red
     t = t < 0 ? 0 : t > 1 ? 1 : t;
     var f = t * (RAMP.length - 1), j = Math.min(RAMP.length - 2, Math.floor(f)), u = f - j, c0 = RAMP[j], c1 = RAMP[j + 1];
@@ -130,7 +130,7 @@
       }
     }
     prev.set(cur);
-    // 3) red / cyan split, colour crush, purple guard -> pixels
+    // 3) red / blue split, colour crush, pink guard -> pixels
     var sp2 = bypass ? 0 : Math.round(P.split * 0.6), L = (!bypass && P.crush > 0) ? Math.max(2, 34 - 2 * P.crush) : 0, qs = L ? 255 / (L - 1) : 0;
     for (var y2 = 0; y2 < H; y2++) {
       for (var x2 = 0; x2 < W; x2++) {
@@ -140,7 +140,14 @@
           r = cur[ir]; g = cur[ic + 1]; b = cur[ic + 2];
         } else { r = cur[p * 3]; g = cur[p * 3 + 1]; b = cur[p * 3 + 2]; }
         if (L) { r = Math.round(r / qs) * qs; g = Math.round(g / qs) * qs; b = Math.round(b / qs) * qs; }
-        if (r > g && b > g) g = r < b ? r : b; // never let red + blue meet without green (no pink / magenta / purple)
+        if (r > g && b > g) { // pink guard: purple is fine (hue up to ~276), pink / magenta is not
+          if (b >= r) { var rm = g + 0.6 * (b - g); if (r > rm) r = rm; } // keep it violet
+          else if (b - g > 0.15 * (r - g)) b = g + 0.15 * (r - g);      // red-dominant: back to red
+        }
+        var mn = g < b ? g : b, mx2 = g < b ? b : g;
+        if (r > 150 && r > mx2 + 12 && mn > 0.35 * r && (g - b) < 0.35 * (r - b)) { // pale rose / salmon reads pink
+          if (r - mn > 60) { g = b = mn * 0.4; } else { r = mx2 + 6; }           // strong tint -> deep red, faint tint -> neutral
+        }
         out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = 255;
       }
     }

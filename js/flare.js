@@ -5,7 +5,8 @@
 (function () {
   'use strict';
   var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-  var PAL = ['#ff3b3b', '#ff8a1f', '#ffd21f', '#c4ff2e', '#2bff88', '#22e4ff', '#2f8bff'];
+  // two families, one per burst, so translucent red never stacks on purple (that mix reads pink)
+  var WARM = ['#ff3b3b', '#e5202f', '#b3121f', '#ff5a3c'], COOL = ['#8a3dff', '#a066ff', '#b48cff', '#7a2cff', '#4b1aa8', '#2f6bff'], PAL = COOL;
   var cv = document.createElement('canvas');
   cv.className = 'flare-layer'; cv.setAttribute('aria-hidden', 'true');
   document.body.appendChild(cv);
@@ -17,12 +18,18 @@
   var seed = 20260927;
   function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
   function pick() { return PAL[Math.floor(rnd() * PAL.length)]; }
+  function isWarm(c) { // red-dominant tint (hex or rgb())
+    if (!c) return false; var m = /^#([0-9a-f]{6})$/i.exec(c), r, g, b;
+    if (m) { var n = parseInt(m[1], 16); r = n >> 16; g = n >> 8 & 255; b = n & 255; } else { m = /(\d+)\D+(\d+)\D+(\d+)/.exec(c); if (!m) return false; r = +m[1]; g = +m[2]; b = +m[3]; }
+    return r > b + 40 && r > g + 40;
+  }
 
   var energy = 0, tint = null, sweep = -1, raf = 0, last = 0, regen = 0, bands = [], blocks = [], slivers = [];
   function regenerate(e) {
     bands = []; blocks = []; slivers = [];
+    PAL = isWarm(tint) ? WARM : tint ? COOL : (rnd() < .3 ? WARM : COOL); var tc = PAL === WARM || !isWarm(tint) ? tint : null;
     var n = Math.round(3 + e * 14);
-    for (var i = 0; i < n; i++) bands.push({ x: (rnd() - .3) * W, y: rnd() * H, w: W * (.15 + rnd() * .7), h: Math.max(1, (1 + rnd() * H * .05) * (.5 + e)), vx: (rnd() - .5) * 14 * (.5 + e), c: tint && rnd() < .45 ? tint : pick(), a: .05 + rnd() * .2 });
+    for (var i = 0; i < n; i++) bands.push({ x: (rnd() - .3) * W, y: rnd() * H, w: W * (.15 + rnd() * .7), h: Math.max(1, (1 + rnd() * H * .05) * (.5 + e)), vx: (rnd() - .5) * 14 * (.5 + e), c: tc && rnd() < .45 ? tc : pick(), a: .05 + rnd() * .2 });
     var m = Math.round(e * 5);
     for (var j = 0; j < m; j++) slivers.push({ y: rnd() * H, h: 1 + rnd() * 2.5, off: 3 + e * 9 });
     var b = Math.round(e * 20);
@@ -33,13 +40,13 @@
     bands.forEach(function (B) { B.x += B.vx * dt / 16; ctx.globalAlpha = B.a * e; ctx.fillStyle = B.c; ctx.fillRect(B.x, B.y, B.w, B.h); });
     slivers.forEach(function (S) {
       ctx.globalAlpha = .34 * e; ctx.fillStyle = '#ff3b3b'; ctx.fillRect(-S.off, S.y, W, S.h);
-      ctx.fillStyle = '#22e4ff'; ctx.fillRect(S.off, S.y + S.h, W, S.h);
+      ctx.fillStyle = '#a066ff'; ctx.fillRect(S.off, S.y + S.h, W, S.h);
     });
     blocks.forEach(function (K) { ctx.globalAlpha = K.a * e; ctx.fillStyle = K.c; ctx.fillRect(K.x, K.y, K.w, K.h); });
     if (sweep >= 0) {
       var cx = -W * .35 + sweep * W * 1.7, g = ctx.createLinearGradient(cx - W * .22, 0, cx + W * .22, H * .35);
-      g.addColorStop(0, 'rgba(255,210,31,0)'); g.addColorStop(.42, 'rgba(255,210,31,.26)');
-      g.addColorStop(.5, 'rgba(255,250,232,.42)'); g.addColorStop(.58, 'rgba(255,138,31,.22)'); g.addColorStop(1, 'rgba(255,59,59,0)');
+      g.addColorStop(0, 'rgba(180,140,255,0)'); g.addColorStop(.42, 'rgba(180,140,255,.26)');
+      g.addColorStop(.5, 'rgba(240,236,255,.42)'); g.addColorStop(.58, 'rgba(138,61,255,.22)'); g.addColorStop(1, 'rgba(47,107,255,0)');
       ctx.globalAlpha = Math.max(0, 1 - sweep) * .85; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     }
     ctx.globalAlpha = 1;

@@ -71,7 +71,7 @@
   var curEl = P && P.querySelector('.gng-cur'), durEl = P && P.querySelector('.gng-dur');
   var vol = P && P.querySelector('.gng-volume'), mute = P && P.querySelector('.gng-mute');
   var peaks = null, hoverX = -1;
-  var RAMP = ['#ff3b3b', '#ff8a1f', '#ffd21f', '#c4ff2e', '#2bff88', '#22e4ff', '#2f8bff'];
+  var RAMP = [[0, '#ff3b3b'], [.34, '#c8102e'], [.34, '#7a2cff'], [.7, '#a066ff'], [1, '#b48cff']]; // hard stop: red never blends into purple
 
   function drawWave() {
     if (!cvs) return;
@@ -82,7 +82,7 @@
     var data = peaks ? peaks.peak : null, rms = peaks ? peaks.rms : null;
     var bw = Math.max(2, Math.round(3 * dpr)), gap = Math.max(1, Math.round(dpr)), n = Math.floor(W / (bw + gap));
     var prog = audio.currentTime / dur(), mid = H / 2;
-    var g = c.createLinearGradient(0, 0, W, 0); RAMP.forEach(function (col, i) { g.addColorStop(i / (RAMP.length - 1), col); });
+    var g = c.createLinearGradient(0, 0, W, 0); RAMP.forEach(function (s) { g.addColorStop(s[0], s[1]); });
     var lvl = window.BH_audio.on ? window.BH_audio.level : 0;
     for (var i = 0; i < n; i++) {
       var u = i / n, v = .06, vr = .03;
@@ -90,9 +90,9 @@
       var h = Math.max(2 * dpr, v * (H * .92)), hr = Math.max(dpr, Math.min(h, vr * 2.1 * H * .92));
       var x = i * (bw + gap), played = u < prog;
       var hot = played && prog - u < .012;
-      c.globalAlpha = played ? .38 : .22; c.fillStyle = played ? g : '#8fa4c8';
+      c.globalAlpha = played ? .38 : .22; c.fillStyle = played ? g : '#a59cb8';
       c.fillRect(x, mid - h / 2, bw, h);
-      c.globalAlpha = played ? 1 : .55; c.fillStyle = played ? g : '#b8c6e0';
+      c.globalAlpha = played ? 1 : .55; c.fillStyle = played ? g : '#cbc4da';
       var hh = hr * (hot ? 1 + lvl * .6 : 1); c.fillRect(x, mid - hh / 2, bw, hh);
     }
     c.globalAlpha = 1;
@@ -135,7 +135,7 @@
 
   // ---------- audio-reactive loop (only while playing) ----------
   var raf = 0, slow = 0, fast = 0, lastKick = 0, lvlS = 0, bassS = 0;
-  var PAL = ['#ff3b3b', '#ff8a1f', '#ffd21f', '#2bff88', '#22e4ff', '#2f8bff'], REG = ['sound', 'live', 'visuals', 'lab', 'work', 'about', 'plugins'];
+  var PAL = ['#ff3b3b', '#8a3dff', '#b48cff', '#a066ff', '#f2c94c', '#2f6bff'], REG = ['sound', 'live', 'visuals', 'lab', 'work', 'about', 'plugins'];
   function heroOn() { if (!svg) return false; var r = svg.getBoundingClientRect(); return r.bottom > 60 && r.top < window.innerHeight; }
   function reactive() { return !!analyser && !mqReduce.matches; }
   function tick(now) {

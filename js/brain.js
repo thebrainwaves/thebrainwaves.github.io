@@ -9,8 +9,8 @@
   // seeded RNG so the brain looks the same on every load
   function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   var rand = rng(4242);
-  // region palette (no pink / magenta / purple / violet anywhere)
-  var COLORS = { about: '#ffd21f', plugins: '#ff8a1f', live: '#ff3b3b', work: '#c4ff2e', visuals: '#22e4ff', sound: '#2f8bff', lab: '#2bff88', contact: '#eef4ff' };
+  // region palette: red + purple lead, one blue (Music & Sound), white, gold for Contact (no pink / hot pink / light magenta)
+  var COLORS = { about: '#b48cff', plugins: '#965aff', live: '#ff3b3b', work: '#f03040', visuals: '#f4f2fa', sound: '#2f6bff', lab: '#a066ff', contact: '#f2c94c' };
   function rgba(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }
   window.BH_COLORS = COLORS;
   function el(tag, attrs, parent) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
@@ -78,7 +78,7 @@
     var label = n.querySelector('.nl-main').textContent;
     n.setAttribute('aria-label', label + ': go to this section (focus or hover shows a preview)');
     n.setAttribute('aria-expanded', 'false'); n.setAttribute('aria-controls', 'cell');
-    var col = COLORS[r] || '#1fb6ff', gid = 'g-region-' + r;
+    var col = COLORS[r] || '#a066ff', gid = 'g-region-' + r;
     var rg = el('radialGradient', { id: gid }, svg.querySelector('defs'));
     el('stop', { offset: 0, 'stop-color': col, 'stop-opacity': .6 }, rg);
     el('stop', { offset: .45, 'stop-color': col, 'stop-opacity': .2 }, rg);
@@ -91,7 +91,7 @@
     ['work', 'lab'], ['live', 'visuals'], ['visuals', 'lab'], ['sound', 'lab'], ['lab', 'contact'], ['sound', 'contact'], ['work', 'contact'],
     ['plugins', 'about'], ['plugins', 'work'], ['plugins', 'live']];
   var axG = document.getElementById('axons'), axons = [];
-  var FLOW = ['#ff3b3b', '#ff8a1f', '#ffd21f', '#c4ff2e', '#2bff88', '#22e4ff', '#2f8bff', '#22e4ff', '#2bff88', '#c4ff2e', '#ffd21f', '#ff8a1f', '#ff3b3b'];
+  var FLOW = ['#ff3b2f', '#ff5a3d', '#e8141f', '#b3121f', '#120a14', '#4b1aa8', '#8a3dff', '#2f6bff', '#8a3dff', '#4b1aa8', '#120a14', '#b3121f', '#e8141f', '#ff5a3d', '#ff3b2f']; // red reaches purple only through near-black
   links.forEach(function (lk, i) {
     var A = nodes[lk[0]], B = nodes[lk[1]];
     var mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy);
@@ -116,7 +116,7 @@
 
   // ---------- ambient neuron field ----------
   var cellsG = document.getElementById('ambient-cells'), edgesG = document.getElementById('ambient-edges');
-  function nearest(x, y) { var best = null, bd = 1e9; for (var k in nodes) { var dd = Math.hypot(nodes[k].x - x, nodes[k].y - y); if (dd < bd) { bd = dd; best = nodes[k].color; } } return best || '#1fb6ff'; }
+  function nearest(x, y) { var best = null, bd = 1e9; for (var k in nodes) { var dd = Math.hypot(nodes[k].x - x, nodes[k].y - y); if (dd < bd) { bd = dd; best = nodes[k].color; } } return best || '#a066ff'; }
   var cells = [], ambient = [];
   for (var c = 0; c < 64; c++) { var q = samplePoint(10); cells.push(q); var ce = el('circle', { cx: q[0].toFixed(1), cy: q[1].toFixed(1), r: (1.2 + rand() * 1.8).toFixed(2) }, cellsG); ce.style.fill = rgba(nearest(q[0], q[1]), .7); }
   var seen = {};
@@ -142,7 +142,7 @@
     var s = target.el.cloneNode(false);
     s.removeAttribute('class');
     s.setAttribute('fill', 'none');
-    var pc = opts.color || '#eef4ff';
+    var pc = opts.color || '#f4f2fa';
     s.setAttribute('stroke', pc);
     s.setAttribute('stroke-width', opts.width || 2.4);
     s.setAttribute('stroke-linecap', 'round');
