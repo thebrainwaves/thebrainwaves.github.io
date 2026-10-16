@@ -72,6 +72,19 @@
     });
   });
 
+  // Spotify: player loads only after a click (no third-party request or cookies before consent)
+  document.querySelectorAll('.sp-gate[data-sp]').forEach(function (box) {
+    var btn = box.querySelector('.sp-load'); if (!btn) return;
+    btn.addEventListener('click', function () {
+      var src = box.dataset.sp; if (src.indexOf('https://open.spotify.com/embed/') !== 0) return;
+      var f = document.createElement('iframe');
+      f.src = src; f.title = box.dataset.title || 'Spotify player'; f.className = 'sp-embed';
+      f.height = box.dataset.h || '352'; f.width = '100%';
+      f.allow = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
+      box.innerHTML = ''; box.appendChild(f); box.classList.remove('sp-gate'); f.focus();
+    });
+  });
+
   // in-page links inside the neuron preview (e.g. Sound -> #artist): close the cell, then travel
   var cellEl = document.getElementById('cell');
   if (cellEl) cellEl.addEventListener('click', function (ev) {
