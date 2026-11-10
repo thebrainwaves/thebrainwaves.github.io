@@ -27,7 +27,7 @@ export class PictureController{
   }
   if(this.effects().length)this.onChange();this.draw();
  }
- draw(){this.overlay.replaceChildren();const first=this.effects()[0],def=EFFECTS.find(e=>e.id===first?.id);let i=0;for(const p of this.points.values()){
+ draw(){this.overlay.replaceChildren();const first=this.effects()[0],def=first?.params?{params:first.params}:EFFECTS.find(e=>e.id===first?.id);let i=0;for(const p of this.points.values()){
   const dot=document.createElement('div');dot.className='touch-dot touch-'+i;dot.style.left=p.x*100+'%';dot.style.top=(1-p.y)*100+'%';const label=document.createElement('span');const m=first?.touch;label.style.left=p.x>.5?'-150px':'0px';const name=k=>m[k]===-1?'Intensity':m[k]===-2?'—':def.params[m[k]].name;label.textContent=first?`${i+1} / ${name(i?'x2':'x')} · ${name(i?'y2':'y')}`:String(i+1);dot.append(label);this.overlay.append(dot);i++;
  }if(!this.freeze)this.status.textContent=this.points.size===2?'XY 1 + XY 2 / PINCH + TWIST':this.points.size?'XY / hold still to freeze':'';
  }

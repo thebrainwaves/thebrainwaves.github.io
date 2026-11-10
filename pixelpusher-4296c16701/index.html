@@ -20,7 +20,7 @@
 </head>
 <body>
 <div class="app">
-<header class="topbar"><div class="brand"><img src="./icons/icon.svg" width="30" height="30" alt="Pixel Pusher icon"><div><h1>PIXEL PUSHER<span class="version"> / v1.1.1</span></h1><p>BRAINHERTZ PRODUCTIONS</p></div></div><button id="privacy" class="local-status" aria-label="Show privacy and offline information"><span class="dot"></span> ON DEVICE</button></header>
+<header class="topbar"><div class="brand"><img src="./icons/icon.svg" width="30" height="30" alt="Pixel Pusher icon"><div><h1>PIXEL PUSHER<span class="version"> / v1.2</span></h1><p>BRAINHERTZ PRODUCTIONS</p></div></div><button id="privacy" class="local-status" aria-label="Show privacy and offline information"><span class="dot"></span> ON DEVICE</button></header>
 <main>
 <section class="sourcebar" aria-label="Visual source">
 <label class="button primary file-label">Import media<input id="file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/*"></label>
@@ -36,13 +36,14 @@
 <div class="stage-bottom"><button id="play" hidden>Pause clip</button><button id="compare" aria-pressed="false">Hold / original</button></div>
 </section>
 <div class="presetbar"><label for="preset">LOOK</label><select id="preset" aria-label="Preset"></select><button id="randomize" aria-label="Randomize effects">Shuffle</button><button id="reset" aria-label="Reset all effects">Reset</button></div>
-<nav class="tabs" aria-label="Control sections"><button data-tab="stack" aria-selected="true">01 <span>Stack</span></button><button data-tab="audio" aria-selected="false">02 <span>Audio</span></button><button data-tab="export" aria-selected="false">03 <span>Output</span></button></nav>
+<nav class="tabs" aria-label="Control sections"><button data-tab="stack" aria-selected="true">01 <span>Stack</span></button><button data-tab="shader" aria-selected="false">02 <span>Shader</span></button><button data-tab="audio" aria-selected="false">03 <span>Audio</span></button><button data-tab="export" aria-selected="false">04 <span>Output</span></button></nav>
 <section id="panel-stack" class="panel" aria-label="Effect stack">
 <div class="section-head"><h2>Signal chain</h2><span>TOP → BOTTOM</span></div>
 <p class="hint">Tap an effect to tune. Enable layers and move them in the chain.</p>
 <label class="toggle-line"><input id="touch-multi" type="checkbox">Picture controls all enabled layers</label><p class="hint">Picture: drag = XY · two fingers = XY2 / pinch / twist · tap = stutter · hold = freeze. Selected layer is the default target.</p><div id="stack"></div>
 <div class="save-preset"><label for="preset-name">Save your look</label><div><input id="preset-name" maxlength="40" placeholder="Name this look" autocomplete="off"><button id="save-preset">Save</button></div></div>
 </section>
+<section id="panel-shader" class="panel" aria-label="Shader layer controls" hidden></section>
 <section id="panel-audio" class="panel" aria-label="Audio controls" hidden>
 <div class="section-head"><h2>Sound → motion</h2><span>LOCAL ANALYSER</span></div>
 <p class="hint">Sound modulates the selected slider of each layer marked “Audio drive”. Microphone sound is never played through your speakers.</p>
@@ -62,12 +63,12 @@
 <div class="section-head"><h3>Exports</h3><span id="format">DETECTING FORMAT</span></div><div id="exports"><p class="hint" id="no-exports">Exports appear here. Save them before closing this app.</p></div>
 </section>
 <div id="notice" class="notice" role="status" aria-live="polite">Private by design. Import a source or explore the internal signal.</div>
-<footer class="credits">ORIGINAL VISUAL INSTRUMENT · V1.1.1<br><span id="offline-status">Offline shell loading…</span></footer>
+<footer class="credits">ORIGINAL VISUAL INSTRUMENT · V1.2<br><span id="offline-status">Offline shell loading…</span></footer>
 </main>
 <section id="record-drawer" class="record-drawer" data-open="true" hidden aria-label="Recording effects controls"><button id="drawer-toggle" aria-expanded="true" aria-controls="record-controls">Controls</button><div id="record-quick" aria-label="Active effects quick controls"></div><div id="record-controls"></div></section>
 <div class="recordbar"><div class="record-view" role="group" aria-label="Record view"><span>Record view</span><button id="view-box" aria-pressed="true">In box</button><button id="view-full" aria-pressed="false">Full screen</button></div><button id="snapshot" aria-label="Export PNG snapshot">PNG<span>Snapshot</span></button><button id="record" class="record"><span class="record-symbol"></span><span id="record-text">Record video</span><output id="recordbar-timer" hidden>00:00</output></button></div>
 </div>
 <video id="media" class="source-media" playsinline muted loop preload="auto"></video>
-<dialog id="privacy-dialog"><h2>Only on this device.</h2><p>Photos, videos, camera frames and audio stay in this app. No accounts, analytics, uploads, external services or third-party runtime code.</p><p>Only named presets are stored locally. Exports remain in memory until saved. The app shell is cached for offline use; the browser may clear it.</p><p>Camera and microphone need HTTPS (or localhost for local development), plus your permission. Install from Safari using Share → Add to Home Screen once a host is approved.</p><button id="close-privacy">Back to instrument</button></dialog>
+<dialog id="privacy-dialog"><h2>Only on this device.</h2><p>Photos, videos, camera frames and audio stay in this app. No accounts, analytics, uploads, external services or CDN requests. Three.js is bundled locally under its MIT license.</p><p>Only named looks, custom GLSL and recording-view choices are stored locally. Exports remain in memory until saved. The app shell is cached for offline use; the browser may clear it.</p><p>Camera and microphone need HTTPS (or localhost for local development), plus your permission. Install from Safari using Share → Add to Home Screen once a host is approved.</p><button id="close-privacy">Back to instrument</button></dialog>
 </body>
 </html>

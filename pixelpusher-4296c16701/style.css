@@ -28,3 +28,18 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 body.recording-fullscreen{overflow:hidden;overscroll-behavior:none}body.recording-fullscreen .app{padding:0}body.recording-fullscreen main>*,body.recording-fullscreen .topbar{display:none!important}body.recording-fullscreen main>.stage{display:flex!important;position:fixed;inset:0;width:100%;height:100dvh;border:0;z-index:6}body.recording-fullscreen .stage-top,body.recording-fullscreen .stage-bottom,body.recording-fullscreen .stage-corners{display:none!important}body.recording-fullscreen #touch-status{bottom:calc(155px + env(safe-area-inset-bottom))}body.recording-fullscreen #stop-touch{display:block!important}body.recording-fullscreen #record-badge{top:calc(12px + env(safe-area-inset-top))}
 
 html.recording-in-box{scroll-padding-top:325px}html.recording-in-box .stage{position:sticky;top:0;z-index:4}@media(min-width:700px){html.recording-in-box{scroll-padding-top:485px}}
+/* Shader controls share the restrained signal-chain vocabulary. */
+.tabs{grid-template-columns:repeat(4,1fr)}
+#panel-shader .param{display:block;font-size:12px;color:#aeb7ca;margin-top:14px}
+#panel-shader .param output{float:right;font-variant-numeric:tabular-nums}
+#panel-shader .param input{display:block;width:100%;margin-top:6px}
+#panel-shader .toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:16px 0}
+#panel-shader .fine{font-size:11px;line-height:1.6;color:#8290a9}
+#panel-shader .shader-mod{padding:5px 0 9px;border-bottom:1px solid #202635;font-size:11px}
+#panel-shader details label{display:block;margin:8px 0;color:#aeb7ca}
+#panel-shader details select,#panel-shader details input[type=range]{width:100%}
+#panel-shader .shader-xy{margin:20px 0 10px;touch-action:none}
+#shader-editor{margin-top:20px;border-top:1px solid #2a3040;padding:14px 0}
+#shader-editor select,#shader-editor button,#shader-save-name{margin:6px 0;max-width:100%}
+#shader-code{display:block;width:100%;box-sizing:border-box;background:#080c13;color:#a5b9e1;border:1px solid #2b3448;border-radius:4px;font:11px/1.5 monospace;padding:10px;resize:vertical;margin:10px 0;tab-size:2}
+#shader-error{white-space:pre-wrap;overflow-wrap:anywhere;color:#d5a5a9!important;max-height:180px;overflow:auto}

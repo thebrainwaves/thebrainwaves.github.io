@@ -1,3 +1,4 @@
+import {normalizeShaderState} from './shader-state.js';
 // Original Brainhertz Productions implementation. All state values are normalized.
 const p = (name,value) => ({name,value});
 export const EFFECTS = [
@@ -43,7 +44,7 @@ export function chooseMime(supported,{preferMp4=true}={}){
   return type;
 }
 export function normalizeLimit(value){const n=Number(value);return Number.isFinite(n)?clamp(n,3,300):60;}
-export function normalizePreset(value){if(!value||typeof value.name!=='string'||!Array.isArray(value.stack))return null;return {name:value.name.trim().slice(0,40)||'Untitled',stack:sanitizeStack(value.stack)};}
+export function normalizePreset(value){if(!value||typeof value.name!=='string'||!Array.isArray(value.stack))return null;return {name:value.name.trim().slice(0,40)||'Untitled',stack:sanitizeStack(value.stack),...(value.shader?{shader:normalizeShaderState(value.shader)}:{})};}
 export function recordingLimit(seconds,bytes,limit){if(bytes>=256*1024*1024)return 'memory';if(seconds>=limit)return 'duration';return null;}
 const preset=(name,config)=>({name,stack:defaultStack().map(e=>({...e,enabled:!!config[e.id],values:e.values.map((v,i)=>config[e.id]?.[i]??v)}))});
 export const PRESETS=[
@@ -74,3 +75,5 @@ PRESETS.push(
 
 export const mappedValue=(effect,index)=>index===-1?effect.intensity:index===-2?.5:effect.values[index];
 export function setMappedValue(effect,index,value){if(index===-2)return;if(index===-1)effect.intensity=clamp(value);else effect.values[index]=clamp(value);}
+
+for(const [name,scene,mode]of [['Cobalt tunnel','tunnel','background'],['Signal constellation','particles','composite'],['Audio topography','mesh','background'],['Recursive chamber','fractal','background'],['Wire architecture','wireframe','background']])PRESETS.push({name,stack:defaultStack().map(e=>({...e,enabled:e.id==='rgb',values:e.values.map((v,i)=>i===0?.08:v)})),shader:normalizeShaderState({enabled:true,scene,mode,opacity:1})});
