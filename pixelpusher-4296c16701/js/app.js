@@ -1,6 +1,7 @@
+import {PerformanceConsole} from './performance-console.js';
 import {ShaderUI} from './shader-ui.js';
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,normalizePreset,normalizeLimit,randomizeStack,QualityController,BeatClock} from './core.js';
-import {readPresets,PRESET_KEY} from './storage.js';
+import {readPresets,PRESET_KEY,serializePresets} from './storage.js';
 import {PictureController,bindXY} from './touch.js';
 import {RecordView} from './record-view.js';
 import {Renderer} from './gpu.js';
@@ -8,11 +9,13 @@ import {AudioEngine} from './audio.js';
 import {Capture,recordingMime} from './recorder.js';
 const $=id=>document.getElementById(id);
 const canvas=$('output'),video=$('media'),audio=new AudioEngine(video);
+let performanceUI=null,consoleMutation=false;
 let renderer,stack=defaultStack(),selected='rgb',sourceKind='demo',sourceURL=null,camera=null,facing='environment',sourceBusy=false;
 let source,compare=false,reactive=false,sensitivity=1.5,lastFrame=0,loopStart=null,loopLength=6,recordKind='video',wakeLock=null,renderFailed=false;
 const quality=new QualityController(),beatClock=new BeatClock();let frameAverage=16,lastMeasured=0;
 const exports=[],KEY=PRESET_KEY;
-const note=(message,error=false)=>{$('notice').textContent=message;$('notice').classList.toggle('error',error);};
+let toastTimer;
+const note=(message,error=false)=>{$('notice').textContent=message;$('notice').classList.toggle('error',error);const toast=$('performance-toast');if(toast){clearTimeout(toastTimer);toast.hidden=!error;if(error){toast.textContent=message;toastTimer=setTimeout(()=>toast.hidden=true,6500);}}};
 const safe=fn=>async(...args)=>{try{await fn(...args);}catch(e){note(e.message||'This operation could not complete.',true);}};
 const node=(tag,className,text)=>{const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
 const demo=document.createElement('canvas');demo.width=720;demo.height=1280;
@@ -42,7 +45,7 @@ function renderStack(){
  stack.forEach((effect,i)=>{
   const def=EFFECTS.find(e=>e.id===effect.id),card=node('article','effect'+(effect.enabled?' on':'')+(selected===effect.id?' selected':''));card.dataset.effect=effect.id;
   const head=node('div','effect-head'),toggle=node('button','effect-toggle',effect.enabled?'ON':'OFF');toggle.setAttribute('aria-label','Enable '+def.name);toggle.setAttribute('aria-pressed',String(effect.enabled));
-  toggle.addEventListener('click',()=>{effect.enabled=!effect.enabled;$('preset').value='custom';renderStack();});
+  toggle.addEventListener('click',()=>{effect.enabled=!effect.enabled;performanceUI?.externalChange();$('preset').value='custom';renderStack();});
   const title=node('button','effect-title',def.name);title.append(node('small',null,def.tag));title.setAttribute('aria-expanded',String(selected===effect.id));title.addEventListener('click',()=>{selected=selected===effect.id?null:effect.id;renderStack();});
   const up=node('button','move','↑'),down=node('button','move','↓');up.setAttribute('aria-label','Move '+def.name+' up');down.setAttribute('aria-label','Move '+def.name+' down');up.disabled=i===0;down.disabled=i===stack.length-1;
   up.addEventListener('click',()=>{stack=moveEffect(stack,i,-1);$('preset').value='custom';renderer.clearHistory();renderStack();});down.addEventListener('click',()=>{stack=moveEffect(stack,i,1);$('preset').value='custom';renderer.clearHistory();renderStack();});const lock=node('button','lock-effect',effect.locked?'LOCK':'FREE');lock.setAttribute('aria-label','Lock '+def.name+' for shuffle');lock.setAttribute('aria-pressed',String(effect.locked));lock.addEventListener('click',()=>{effect.locked=!effect.locked;renderStack();});head.append(toggle,title,lock,up,down);card.append(head);
@@ -62,22 +65,24 @@ function renderStack(){
   }
   wrap.append(card);
  });
- recordView.renderQuick();
+ recordView.renderQuick();performanceUI?.sync(true);
 }
-function syncTouchInputs(){recordView.sync();shaderUI.sync();for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){input.value=v;const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=Math.round(v*100)+'%';}});}$('preset').value='custom';}
-const picture=new PictureController(canvas,$('touch-overlay'),{getEffects:()=>[...stack,shaderUI.state].filter(e=>$('touch-multi').checked?e.enabled:e.id===selected),onChange:syncTouchInputs,onFreeze:value=>{if(renderer)renderer.freeze=value;},onStutter:()=>{if(renderer)renderer.stutterUntil=performance.now()+160;},status:$('touch-status')});
-const recordView=new RecordView(()=>[...stack,shaderUI.state],syncTouchInputs);
-const shaderUI=new ShaderUI($('panel-shader'),{onChange:()=>{$('preset').value='custom';recordView.renderQuick();},onTarget:()=>{selected='shader';renderStack();}});
+function syncTouchInputs(){performanceUI?.sync(true);performanceUI?.schedule();recordView.sync();shaderUI.sync();for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){input.value=v;const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=Math.round(v*100)+'%';}});}$('preset').value='custom';}
+const picture=new PictureController(canvas,$('touch-overlay'),{getEffects:()=>[...stack,shaderUI.state,...(performanceUI?.groups||[])].filter(e=>$('touch-multi').checked?e.enabled:e.id===selected),onChange:syncTouchInputs,onFreeze:value=>{if(renderer)renderer.freeze=value;},onStutter:()=>{if(renderer)renderer.stutterUntil=performance.now()+160;},status:$('touch-status')});
+const recordView=new RecordView(()=>[...stack,shaderUI.state,...(performanceUI?.groups||[])],syncTouchInputs);
+const shaderUI=new ShaderUI($('panel-shader'),{onChange:()=>{$('preset').value='custom';recordView.renderQuick();if(!consoleMutation)performanceUI?.externalChange();},onTarget:()=>{selected='shader';renderStack();}});
+performanceUI=new PerformanceConsole($('performance-dock'),{getModel:()=>({stack,shader:shaderUI.state}),getTarget:()=>selected,setShader:s=>{consoleMutation=true;try{shaderUI.setState(s);}finally{consoleMutation=false;}},onChange:reason=>{shaderUI.sync();if(selected?.startsWith('group:')&&!performanceUI.groups.some(g=>g.id===selected))selected=stack.find(e=>e.enabled)?.id||'rgb';if(['toggle','structure','scene'].includes(reason))renderStack();else syncTouchInputs();$('preset').value='custom';},onTarget:(id,render=true)=>{selected=id;if(render)renderStack();},onStudio:tab=>{document.body.classList.add('studio-open');$('studio-toggle').setAttribute('aria-pressed','true');if(recordView.recording&&recordView.view==='full')recordView.open(true);showTab(tab);},note,cancelPicture:()=>picture.cancel()});
+$('studio-toggle').addEventListener('click',()=>{const open=!document.body.classList.contains('studio-open');document.body.classList.toggle('studio-open',open);$('studio-toggle').setAttribute('aria-pressed',String(open));});
 const shaderBands={low:0,mid:0,high:0,beat:0,bpm:120,phase:0};
 function showTab(tab){if(tab==='shader'){selected='shader';renderStack();}else if(tab==='stack'&&selected==='shader'){selected=stack.find(e=>e.enabled)?.id||'rgb';renderStack();}document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));for(const name of ['stack','shader','audio','export'])$('panel-'+name).hidden=name!==tab;}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
 function setCompare(value){compare=value;$('compare').setAttribute('aria-pressed',String(value));$('live-label').textContent=value?'ORIGINAL / BYPASS':'LIVE PROCESSING';}
 $('compare').addEventListener('pointerdown',e=>{e.preventDefault();$('compare').setPointerCapture(e.pointerId);setCompare(true);});for(const e of ['pointerup','pointercancel','lostpointercapture'])$('compare').addEventListener(e,()=>setCompare(false));
 $('compare').addEventListener('contextmenu',e=>e.preventDefault());$('compare').addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();setCompare(true);}});$('compare').addEventListener('keyup',()=>setCompare(false));$('compare').addEventListener('blur',()=>setCompare(false));window.addEventListener('blur',()=>setCompare(false));
-$('preset').addEventListener('change',()=>{const selection=$('preset').value,[type,index]=selection.split(':');const preset=type==='built'?PRESETS[Number(index)]:userPresets[Number(index)];if(preset){stack=sanitizeStack(preset.stack);shaderUI.setState(preset.shader);renderer.clearHistory();renderStack();$('preset').value=selection;note(preset.name+' loaded.');}});
-$('randomize').addEventListener('click',()=>{stack=randomizeStack(stack);renderer.clearHistory();$('preset').value='custom';renderStack();note('New signal chain generated.');});
-$('reset').addEventListener('click',()=>{stack=defaultStack().map(e=>({...e,enabled:false,reactive:false}));shaderUI.setState();renderer.clearHistory();$('preset').value='custom';renderStack();note('All effects bypassed. Your source is unchanged.');});
-$('save-preset').addEventListener('click',safe(()=>{if(userPresets.length>=20)throw new Error('20 saved looks reached. Existing looks are preserved.');const name=$('preset-name').value.trim();if(!name)throw new Error('Give this look a name first.');const preset=normalizePreset({name,stack,shader:shaderUI.state});const next=[...userPresets,preset];localStorage.setItem(KEY,JSON.stringify(next));userPresets=next;updatePresets();$('preset').value='user:'+(userPresets.length-1);$('preset-name').value='';note('Look saved on this device.');}));
+$('preset').addEventListener('change',()=>{const selection=$('preset').value,[type,index]=selection.split(':');const preset=type==='built'?PRESETS[Number(index)]:userPresets[Number(index)];if(preset){picture.cancel();stack=sanitizeStack(preset.stack);shaderUI.setState(preset.shader);performanceUI.loadPreset(preset.console);renderer.clearHistory();renderStack();$('preset').value=selection;note(preset.name+' loaded.');}});
+$('randomize').addEventListener('click',()=>{performanceUI.externalChange();stack=randomizeStack(stack);renderer.clearHistory();$('preset').value='custom';renderStack();note('New signal chain generated.');});
+$('reset').addEventListener('click',()=>{picture.cancel();performanceUI.reset();stack=defaultStack().map(e=>({...e,enabled:false,reactive:false}));shaderUI.setState();renderer.clearHistory();$('preset').value='custom';renderStack();note('All effects bypassed. Your source is unchanged.');});
+$('save-preset').addEventListener('click',safe(()=>{if(userPresets.length>=20)throw new Error('20 saved looks reached. Existing looks are preserved.');const name=$('preset-name').value.trim();if(!name)throw new Error('Give this look a name first.');const preset=normalizePreset({name,stack,shader:shaderUI.state,console:performanceUI.getPresetState()});const next=[...userPresets,preset];localStorage.setItem(KEY,serializePresets(next));userPresets=next;updatePresets();$('preset').value='user:'+(userPresets.length-1);$('preset-name').value='';note('Look saved on this device.');}));
 function stopCamera(){if(camera){camera.getTracks().forEach(t=>t.stop());camera=null;}$('flip').disabled=true;$('camera').textContent='Camera';}
 function releaseSource(){stopCamera();video.pause();video.srcObject=null;video.removeAttribute('src');video.load();if(sourceURL){URL.revokeObjectURL(sourceURL);sourceURL=null;}$('play').hidden=true;}
 function sourceLabel(text){$('source-name').textContent=text;renderer.clearHistory();}
@@ -181,7 +186,7 @@ function frame(now){
  let time=now/1000,animation=0;
  if(loopStart!==null){const phase=Math.min(1,(now-loopStart)/(loopLength*1000));time=phase*Math.PI*2;animation=Math.sin(phase*Math.PI*2);}
  if(sourceKind==='demo')drawDemo(time);
- try{const start=performance.now();Object.assign(shaderBands,audio.bands(sensitivity),{beat:pulse,bpm:beatClock.bpm,phase:beatClock.phase});const layered=compare||renderer.freeze?source:shaderUI.layer.render(source,shaderUI.state,time,{width:canvas.width,height:canvas.height,bands:shaderBands,frameMs:frameAverage});renderer.render(layered,stack,time,compare,{audio:reactive?level:0,animation,beat:pulse,phase:beatClock.phase});const duration=performance.now()-start;frameAverage=frameAverage*.94+Math.max(duration,interval)*.06;if($('auto-quality').checked&&quality.update(Math.max(duration,interval),capture.active||picture.points.size>0))resize(false);if(now-lastMeasured>1000){lastMeasured=now;shaderUI.status();$('perf-status').textContent=Math.round(frameAverage)+' ms / '+Math.round(quality.scale*100)+'% resolution'+(capture.active?' · capture locked':' · adaptive preview');}}catch(error){renderFailed=true;capture.stop('render interrupted');note('Rendering stopped: '+error.message,true);}
+ try{const start=performance.now();Object.assign(shaderBands,audio.bands(sensitivity),{beat:pulse,bpm:beatClock.bpm,phase:beatClock.phase});const composed=performanceUI.engine.compose({stack,shader:shaderUI.state},time,shaderBands,now);performanceUI.sync(false,now);const layered=compare||renderer.freeze?source:shaderUI.layer.render(source,composed.shader,time,{width:canvas.width,height:canvas.height,bands:shaderBands,frameMs:frameAverage});renderer.render(layered,composed.stack,time,compare,{audio:reactive?level:0,animation,beat:pulse,phase:beatClock.phase});const duration=performance.now()-start;frameAverage=frameAverage*.94+Math.max(duration,interval)*.06;if($('auto-quality').checked&&quality.update(Math.max(duration,interval),capture.active||picture.points.size>0))resize(false);if(now-lastMeasured>1000){lastMeasured=now;shaderUI.status();$('perf-status').textContent=Math.round(frameAverage)+' ms / '+Math.round(quality.scale*100)+'% resolution'+(capture.active?' · capture locked':' · adaptive preview');}}catch(error){renderFailed=true;capture.stop('render interrupted');note('Rendering stopped: '+error.message,true);}
 }
 try{renderer=new Renderer(canvas);$('engine').textContent='WEBGL '+renderer.version;updatePresets();renderStack();requestAnimationFrame(frame);try{$('format').textContent=recordingMime().split(';')[0].toUpperCase();}catch{$('format').textContent='PNG ONLY';}}
 catch(error){renderFailed=true;note(error.message,true);$('record').disabled=true;$('snapshot').disabled=true;}

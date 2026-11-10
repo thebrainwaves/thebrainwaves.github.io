@@ -1,25 +1,8 @@
+import {normalizeConsoleState} from './console-state.js';
 import {normalizeShaderState} from './shader-state.js';
 // Original Brainhertz Productions implementation. All state values are normalized.
-const p = (name,value) => ({name,value});
-export const EFFECTS = [
-  {id:'rgb',name:'RGB split',tag:'CHROMA',mode:1,params:[p('Distance',.25),p('Angle',.1)]},
-  {id:'smear',name:'Block smear',tag:'FLOW MEMORY',mode:2,params:[p('Persistence',.7),p('Block size',.35),p('Flow',.65)]},
-  {id:'sort',name:'Pixel drift',tag:'SORT APPROX.',mode:3,params:[p('Length',.45),p('Threshold low',.15),p('Threshold high',.85),p('Direction / angle',0)]},
-  {id:'vhs',name:'Tape scan',tag:'SIGNAL',mode:4,params:[p('Scanlines',.35),p('Tracking / wobble',.3),p('Noise',.2),p('Chroma bleed',.4)]},
-  {id:'wave',name:'Displacement',tag:'WAVE',mode:5,params:[p('Depth',.3),p('Frequency',.35),p('Speed',.3)]},
-  {id:'trails',name:'Feedback trails',tag:'ZOOM / ROTATE',mode:6,params:[p('Persistence',.65),p('Zoom',.35),p('Rotation',.53)]},
-  {id:'crush',name:'Bit crush',tag:'TONE',mode:7,params:[p('Color steps',.35),p('Pixel size',.12)]},
-  {id:'lattice',name:'Lattice shear',tag:'ORIGINAL / 01',mode:8,params:[p('Shear',.3),p('Cell density',.4),p('Pulse',.4)]},
-  {id:'fold',name:'Signal fold',tag:'ORIGINAL / 02',mode:9,params:[p('Fold',.4),p('Bands',.35),p('Phase',.4)]},
-  {id:'slit',name:'Time ribbon',tag:'SLIT SCAN',mode:10,params:[p('Time depth',.85),p('Direction',.25),p('Sweep',.2)]},
-  {id:'kaleido',name:'Mirror chamber',tag:'KALEIDOSCOPE',mode:11,params:[p('Segments',.3),p('Rotation',.1),p('Mirror / radius',.6)]},
-  {id:'shuffle',name:'Block exchange',tag:'SHUFFLE',mode:12,params:[p('Disorder',.5),p('Grid',.4),p('Rate',.3)]},
-  {id:'glyph',name:'Signal glyph',tag:'ASCII / DITHER',mode:13,params:[p('Cell size',.4),p('ASCII ↔ dither',.25),p('Contrast',.5)]},
-  {id:'chroma',name:'Spectral wave',tag:'CHROMATIC WARP',mode:14,params:[p('Amplitude',.45),p('Frequency',.4),p('Speed',.4)]},
-  {id:'jitter',name:'Line rupture',tag:'SCANLINE JITTER',mode:15,params:[p('Offset',.4),p('Line width',.25),p('Rate',.4)]},
-  {id:'neon',name:'Neon contour',tag:'POSTER / EDGE',mode:16,params:[p('Poster levels',.35),p('Edge glow',.65),p('Palette',.3)]},
-  {id:'beat',name:'Pulse gate',tag:'STROBE / STUTTER',mode:17,params:[p('Stutter ↔ strobe',.15),p('Pulse width',.35),p('Division',.3)]}
-];
+import {EFFECTS} from './effects.js';
+export {EFFECTS} from './effects.js';
 export const clamp=(n,min=0,max=1)=>Math.min(max,Math.max(min,n));
 export function defaultTouch(def){return {x:0,y:1,x2:def.params.length>2?2:-2,y2:def.params.length>3?3:-1,pinch:0,twist:1,spring:false};}
 export function defaultStack(){return EFFECTS.map(e=>({id:e.id,enabled:e.id==='rgb'||e.id==='vhs',intensity:1,locked:false,hold:false,touch:defaultTouch(e),reactive:false,reactiveParam:0,values:e.params.map(p=>p.value)}));}
@@ -44,7 +27,7 @@ export function chooseMime(supported,{preferMp4=true}={}){
   return type;
 }
 export function normalizeLimit(value){const n=Number(value);return Number.isFinite(n)?clamp(n,3,300):60;}
-export function normalizePreset(value){if(!value||typeof value.name!=='string'||!Array.isArray(value.stack))return null;return {name:value.name.trim().slice(0,40)||'Untitled',stack:sanitizeStack(value.stack),...(value.shader?{shader:normalizeShaderState(value.shader)}:{})};}
+export function normalizePreset(value){if(!value||typeof value.name!=='string'||!Array.isArray(value.stack))return null;return {name:value.name.trim().slice(0,40)||'Untitled',stack:sanitizeStack(value.stack),...(value.shader?{shader:normalizeShaderState(value.shader)}:{}),...(value.console?{console:normalizeConsoleState(value.console)}:{})};}
 export function recordingLimit(seconds,bytes,limit){if(bytes>=256*1024*1024)return 'memory';if(seconds>=limit)return 'duration';return null;}
 const preset=(name,config)=>({name,stack:defaultStack().map(e=>({...e,enabled:!!config[e.id],values:e.values.map((v,i)=>config[e.id]?.[i]??v)}))});
 export const PRESETS=[

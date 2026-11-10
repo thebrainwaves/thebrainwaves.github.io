@@ -412,6 +412,8 @@ export class ShaderUI {
   }
   sync() {
     const s = this.state;
+    const enabled = this.root.querySelector("#shader-enabled");
+    if (enabled) enabled.checked = s.enabled;
     for (let i = 0; i < s.values.length; i++) {
       const input = this.root.querySelector(`#shader-param-${i}`);
       if (input) {
