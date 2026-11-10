@@ -1,6 +1,7 @@
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,normalizePreset,normalizeLimit,randomizeStack,QualityController,BeatClock} from './core.js';
 import {readPresets,PRESET_KEY} from './storage.js';
 import {PictureController,bindXY} from './touch.js';
+import {RecordView} from './record-view.js';
 import {Renderer} from './gpu.js';
 import {AudioEngine} from './audio.js';
 import {Capture,recordingMime} from './recorder.js';
@@ -60,9 +61,11 @@ function renderStack(){
   }
   wrap.append(card);
  });
+ recordView.renderQuick();
 }
-function syncTouchInputs(){for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){input.value=v;const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=Math.round(v*100)+'%';}});}$('preset').value='custom';}
+function syncTouchInputs(){recordView.sync();for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){input.value=v;const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=Math.round(v*100)+'%';}});}$('preset').value='custom';}
 const picture=new PictureController(canvas,$('touch-overlay'),{getEffects:()=>stack.filter(e=>$('touch-multi').checked?e.enabled:e.id===selected),onChange:syncTouchInputs,onFreeze:value=>{if(renderer)renderer.freeze=value;},onStutter:()=>{if(renderer)renderer.stutterUntil=performance.now()+160;},status:$('touch-status')});
+const recordView=new RecordView(()=>stack,syncTouchInputs);
 function showTab(tab){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));for(const name of ['stack','audio','export'])$('panel-'+name).hidden=name!==tab;}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
 function setCompare(value){compare=value;$('compare').setAttribute('aria-pressed',String(value));$('live-label').textContent=value?'ORIGINAL / BYPASS':'LIVE PROCESSING';}
@@ -126,7 +129,7 @@ $('mute-monitor').addEventListener('click',()=>{audio.monitorClip(!audio.monitor
 function resize(reset=true){if(reset)quality.reset();const short=Math.max(216,Math.round(Number($('quality').value)*quality.scale)),aspect=$('aspect').value;const [w,h]=aspect==='portrait'?[short,Math.round(short*16/9)]:aspect==='landscape'?[Math.round(short*16/9),short]:[short,short];renderer.resize(w,h);$('dimensions').textContent=w+' × '+h;}
 for(const id of ['quality','aspect'])$(id).addEventListener('change',safe(()=>resize()));
 function recordingUI(active){
- picture.cancel();document.body.classList.toggle('recording-mode',active);$('stop-touch').hidden=!active;if(active)window.scrollTo(0,0);
+ picture.cancel();recordView.setActive(active);
  $('record').classList.toggle('active',active);$('record-text').textContent=active?'Stop recording':'Record video';$('record-badge').hidden=!active;
  for(const id of ['quality','aspect','limit','loop-duration','audio-source','auto-quality'])$(id).disabled=active;
  syncSourceButtons();
@@ -143,7 +146,7 @@ function addExport(blob,kind,description){
  note(description+' ready in Output. Save it before closing.');
 }
 const capture=new Capture(canvas,{
- onTick:(seconds)=>{$('elapsed').textContent=timeLabel(seconds);$('touch-timer').textContent=timeLabel(seconds);},
+ onTick:(seconds)=>{$('elapsed').textContent=timeLabel(seconds);$('touch-timer').textContent=timeLabel(seconds);$('recordbar-timer').textContent=timeLabel(seconds);},
  onFinish:({blob,duration,reason})=>{loopStart=null;releaseWake();recordingUI(false);addExport(blob,'video',(recordKind==='loop'?'Photo loop':'Video')+' / '+duration.toFixed(1)+'s / '+reason);showTab('export');},
  onError:error=>{loopStart=null;releaseWake();recordingUI(false);note(error.message,true);}
 });
@@ -154,7 +157,7 @@ async function startRecording(kind='video'){
  if(sourceKind==='video'){if(video.ended)video.currentTime=0;await video.play();}
  recordKind=kind;const seconds=kind==='loop'?Number($('loop-duration').value):normalizeLimit($('limit').value);$('limit').value=normalizeLimit($('limit').value);
  if(kind==='loop'){loopLength=seconds;loopStart=performance.now();}
- try{const mime=capture.start({audioTracks:audio.tracks(),seconds});$('format').textContent=mime.split(';')[0].toUpperCase();$('elapsed').textContent='00:00';$('touch-timer').textContent='00:00';recordingUI(true);keepAwake();note('Recording on-device. Keep this app visible; '+seconds+'s limit.');}
+ try{const mime=capture.start({audioTracks:audio.tracks(),seconds});$('format').textContent=mime.split(';')[0].toUpperCase();$('elapsed').textContent='00:00';$('touch-timer').textContent='00:00';$('recordbar-timer').textContent='00:00';recordingUI(true);keepAwake();note('Recording on-device. Keep this app visible; '+seconds+'s limit.');}
  catch(error){loopStart=null;throw error;}
 }
 $('stop-touch').addEventListener('click',()=>capture.stop());

@@ -20,7 +20,7 @@
 </head>
 <body>
 <div class="app">
-<header class="topbar"><div class="brand"><img src="./icons/icon.svg" width="30" height="30" alt="Pixel Pusher icon"><div><h1>PIXEL PUSHER<span class="version"> / v1.1</span></h1><p>BRAINHERTZ PRODUCTIONS</p></div></div><button id="privacy" class="local-status" aria-label="Show privacy and offline information"><span class="dot"></span> ON DEVICE</button></header>
+<header class="topbar"><div class="brand"><img src="./icons/icon.svg" width="30" height="30" alt="Pixel Pusher icon"><div><h1>PIXEL PUSHER<span class="version"> / v1.1.1</span></h1><p>BRAINHERTZ PRODUCTIONS</p></div></div><button id="privacy" class="local-status" aria-label="Show privacy and offline information"><span class="dot"></span> ON DEVICE</button></header>
 <main>
 <section class="sourcebar" aria-label="Visual source">
 <label class="button primary file-label">Import media<input id="file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/*"></label>
@@ -62,9 +62,10 @@
 <div class="section-head"><h3>Exports</h3><span id="format">DETECTING FORMAT</span></div><div id="exports"><p class="hint" id="no-exports">Exports appear here. Save them before closing this app.</p></div>
 </section>
 <div id="notice" class="notice" role="status" aria-live="polite">Private by design. Import a source or explore the internal signal.</div>
-<footer class="credits">ORIGINAL VISUAL INSTRUMENT · V1.1.0<br><span id="offline-status">Offline shell loading…</span></footer>
+<footer class="credits">ORIGINAL VISUAL INSTRUMENT · V1.1.1<br><span id="offline-status">Offline shell loading…</span></footer>
 </main>
-<div class="recordbar"><button id="snapshot" aria-label="Export PNG snapshot">PNG<span>Snapshot</span></button><button id="record" class="record"><span class="record-symbol"></span><span id="record-text">Record video</span></button></div>
+<section id="record-drawer" class="record-drawer" data-open="true" hidden aria-label="Recording effects controls"><button id="drawer-toggle" aria-expanded="true" aria-controls="record-controls">Controls</button><div id="record-quick" aria-label="Active effects quick controls"></div><div id="record-controls"></div></section>
+<div class="recordbar"><div class="record-view" role="group" aria-label="Record view"><span>Record view</span><button id="view-box" aria-pressed="true">In box</button><button id="view-full" aria-pressed="false">Full screen</button></div><button id="snapshot" aria-label="Export PNG snapshot">PNG<span>Snapshot</span></button><button id="record" class="record"><span class="record-symbol"></span><span id="record-text">Record video</span><output id="recordbar-timer" hidden>00:00</output></button></div>
 </div>
 <video id="media" class="source-media" playsinline muted loop preload="auto"></video>
 <dialog id="privacy-dialog"><h2>Only on this device.</h2><p>Photos, videos, camera frames and audio stay in this app. No accounts, analytics, uploads, external services or third-party runtime code.</p><p>Only named presets are stored locally. Exports remain in memory until saved. The app shell is cached for offline use; the browser may clear it.</p><p>Camera and microphone need HTTPS (or localhost for local development), plus your permission. Install from Safari using Share → Add to Home Screen once a host is approved.</p><button id="close-privacy">Back to instrument</button></dialog>
