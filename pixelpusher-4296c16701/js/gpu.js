@@ -15,13 +15,13 @@ export class Renderer{
   const vs=compile(gl.VERTEX_SHADER,vertex);this.programs=new Map();
   // Compile constant modes before playback. Dead branches and unused samplers disappear
   // on mobile drivers; no shader compile is triggered by enabling a layer mid-take.
-  for(let mode=0;mode<=18;mode++){
+  for(let mode=0;mode<=19;mode++){
    const fs=compile(gl.FRAGMENT_SHADER,prefix+body.replace('uniform int uMode;',`const int uMode=${mode};`)),program=gl.createProgram();
    gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'aPosition');gl.linkProgram(program);gl.deleteShader(fs);
    if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error('GPU link: '+gl.getProgramInfoLog(program));
    gl.useProgram(program);
-   const u=Object.fromEntries(['Frame','History','Previous','Ring0','Ring1','Ring2','Ring3','Resolution','Cover','Param','Extra','Intensity','Beat','Phase','Time','Mode'].map(n=>[n,gl.getUniformLocation(program,'u'+n)]));
-   gl.uniform1i(u.Frame,0);gl.uniform1i(u.History,1);gl.uniform1i(u.Previous,2);for(let i=0;i<4;i++)gl.uniform1i(u['Ring'+i],3+i);
+   const u=Object.fromEntries(['Frame','Ink','InkMix','History','Previous','Ring0','Ring1','Ring2','Ring3','Resolution','Cover','Param','Extra','Intensity','Beat','Phase','Time','Mode'].map(n=>[n,gl.getUniformLocation(program,'u'+n)]));
+   gl.uniform1i(u.Frame,0);gl.uniform1i(u.Ink,7);gl.uniform1i(u.History,1);gl.uniform1i(u.Previous,2);for(let i=0;i<4;i++)gl.uniform1i(u['Ring'+i],3+i);
    this.programs.set(mode,{program,u});
   }
   gl.deleteShader(vs);this.program=this.programs.get(0).program;this.u=this.programs.get(0).u;gl.useProgram(this.program);
@@ -41,16 +41,17 @@ export class Renderer{
   this.ringIndex=0;this.lastHistory=-1;this.lastOutput=null;gl.bindFramebuffer(gl.FRAMEBUFFER,null);this.feedbackFresh=true;this.ringFresh=true;
  }
  clearHistory(){const gl=this.gl;for(const t of [this.targets[2],...this.ring]){gl.bindFramebuffer(gl.FRAMEBUFFER,t.fbo);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);}gl.bindFramebuffer(gl.FRAMEBUFFER,null);this.feedbackFresh=true;this.ringFresh=true;this.lastHistory=-1;}
- draw(texture,target,mode,values,time,cover=IDENTITY,intensity=1,beat=0,phase=0){
+ draw(texture,target,mode,values,time,cover=IDENTITY,intensity=1,beat=0,phase=0,inkMix=0){
   const gl=this.gl,compiled=this.programs.get(mode);if(this.program!==compiled.program){this.program=compiled.program;this.u=compiled.u;gl.useProgram(this.program);}gl.bindFramebuffer(gl.FRAMEBUFFER,target?.fbo||null);gl.viewport(0,0,target?.width||this.canvas.width,target?.height||this.canvas.height);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,mode?this.targets[2].texture:texture);
   gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,mode?this.ring[(this.ringIndex+2)%4].texture:texture);
   for(let i=0;i<4;i++){gl.activeTexture(gl.TEXTURE3+i);gl.bindTexture(gl.TEXTURE_2D,mode?this.ring[(this.ringIndex+3-i+4)%4].texture:texture);}
+  gl.activeTexture(gl.TEXTURE7);gl.bindTexture(gl.TEXTURE_2D,inkMix?this.inkTexture:texture);gl.uniform1f(this.u.InkMix,inkMix);
   gl.uniform1i(this.u.Mode,mode);gl.uniform3f(this.u.Param,values[0]||0,values[1]||0,values[2]||0);gl.uniform3f(this.u.Extra,values[3]||0,values[4]||0,values[5]||0);gl.uniform1f(this.u.Intensity,intensity);gl.uniform1f(this.u.Beat,beat);gl.uniform1f(this.u.Phase,phase);
   gl.uniform2f(this.u.Resolution,this.canvas.width,this.canvas.height);gl.uniform2f(this.u.Cover,cover[0],cover[1]);gl.uniform1f(this.u.Time,time);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
  }
- render(source,stack,time,compare=false,{audio=0,animation=0,beat=0,phase=0}={}){
+ render(source,stack,time,compare=false,{audio=0,animation=0,beat=0,phase=0,ink=null,inkOpacity=1}={}){
   const gl=this.gl;if(gl.isContextLost())return;if((this.freeze||performance.now()<this.stutterUntil)&&this.lastOutput){gl.useProgram(this.program);this.draw(this.lastOutput,null,0,EMPTY,time);return;}
   const sw=source.videoWidth||source.naturalWidth||source.width,sh=source.videoHeight||source.naturalHeight||source.height;if(!sw||!sh)return;
   gl.useProgram(this.program);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.source);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);
@@ -64,15 +65,19 @@ export class Renderer{
 
   let current=0;
   if(!compare)for(const effect of stack){if(!effect.enabled||effect.intensity===0)continue;const def=DEFINITIONS.get(effect.id);if(!def)continue;
-   const values=this.values;for(let i=0;i<6;i++)values[i]=effect.values[i]||0;values[0]=clamp(values[0]+animation*.13);
+   const values=this.values;for(let i=0;i<6;i++)values[i]=effect.values[i]||0;if(effect.id==='mirror')values[1]=clamp(values[1]+animation*.13);else values[0]=clamp(values[0]+animation*.13);
    const target=effect.reactiveParam||0;if(effect.reactive)values[target]=clamp(values[target]+audio*.55);
    const next=1-current;this.draw(this.targets[current].texture,this.targets[next],def.mode,values,time,IDENTITY,effect.intensity??1,beat,phase);current=next;
   }
-  this.lastOutput=this.targets[current].texture;this.draw(this.lastOutput,null,0,EMPTY,time);
   if(needsFeedback){if(!hold)this.draw(this.targets[current].texture,this.targets[2],0,EMPTY,time);}else this.feedbackFresh=true;
+  if(ink&&!compare&&inkOpacity>0){
+   if(this.inkSource!==ink||this.inkRevision!==ink.inkRevision||ink.inkRevision===undefined){gl.activeTexture(gl.TEXTURE7);if(!this.inkTexture)this.inkTexture=this.texture();gl.bindTexture(gl.TEXTURE_2D,this.inkTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,ink);this.inkSource=ink;this.inkRevision=ink.inkRevision;}
+   const next=1-current;this.draw(this.targets[current].texture,this.targets[next],0,EMPTY,time,IDENTITY,1,0,0,clamp(inkOpacity));current=next;
+  }
+  this.lastOutput=this.targets[current].texture;this.draw(this.lastOutput,null,0,EMPTY,time);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
  }
  pixels(){const gl=this.gl;gl.bindFramebuffer(gl.FRAMEBUFFER,null);const out=new Uint8Array(this.canvas.width*this.canvas.height*4);gl.readPixels(0,0,this.canvas.width,this.canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,out);return out;}
- destroy(){const gl=this.gl;for(const t of [...this.targets,...this.ring]){gl.deleteTexture(t.texture);gl.deleteFramebuffer(t.fbo);}gl.deleteTexture(this.source);gl.deleteBuffer(this.buffer);for(const {program}of this.programs.values())gl.deleteProgram(program);this.programs.clear();}
+ destroy(){const gl=this.gl;for(const t of [...this.targets,...this.ring]){gl.deleteTexture(t.texture);gl.deleteFramebuffer(t.fbo);}gl.deleteTexture(this.source);if(this.inkTexture)gl.deleteTexture(this.inkTexture);gl.deleteBuffer(this.buffer);for(const {program}of this.programs.values())gl.deleteProgram(program);this.programs.clear();}
 }

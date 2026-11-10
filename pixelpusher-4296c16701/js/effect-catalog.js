@@ -15,6 +15,7 @@ const categories = {
   smear: "Datamosh",
   rgb: "Color",
   hue: "Color",
+  mirror: "Distort",
   crush: "Color",
   neon: "Color",
   wave: "Distort",

@@ -4,8 +4,8 @@ import {normalizeShaderState,normalizeModulations} from './shader-state.js';
 import {EFFECTS} from './effects.js';
 export {EFFECTS} from './effects.js';
 export const clamp=(n,min=0,max=1)=>Math.min(max,Math.max(min,n));
-export function defaultTouch(def){if(def.id==='hue')return {x:0,y:2,x2:1,y2:-1,pinch:2,twist:0,spring:false};return {x:0,y:1,x2:def.params.length>2?2:-2,y2:def.params.length>3?3:-1,pinch:0,twist:1,spring:false};}
-export function defaultStack(){return EFFECTS.map(e=>({id:e.id,enabled:e.id==='rgb'||e.id==='vhs',intensity:1,locked:false,hold:false,touch:defaultTouch(e),reactive:false,reactiveParam:0,...(e.id==='hue'?{modulations:normalizeModulations([],3)}:{}),values:e.params.map(p=>p.value)}));}
+export function defaultTouch(def){if(def.id==='mirror')return {x:1,y:2,x2:0,y2:-1,pinch:2,twist:1,spring:false};if(def.id==='hue')return {x:0,y:2,x2:1,y2:-1,pinch:2,twist:0,spring:false};return {x:0,y:1,x2:def.params.length>2?2:-2,y2:def.params.length>3?3:-1,pinch:0,twist:1,spring:false};}
+export function defaultStack(){return EFFECTS.map(e=>({id:e.id,enabled:e.id==='rgb'||e.id==='vhs',intensity:1,locked:false,hold:false,touch:defaultTouch(e),reactive:false,reactiveParam:0,...(['hue','mirror'].includes(e.id)?{modulations:normalizeModulations([],3)}:{}),values:e.params.map(p=>p.value)}));}
 export function sanitizeStack(input){
   const entries=Array.isArray(input)?input.slice(0,32):[];
   const seen=new Set(),out=[];
@@ -14,7 +14,7 @@ export function sanitizeStack(input){
     if(!def||seen.has(def.id))continue;
     seen.add(def.id);
     const touch=defaultTouch(def);for(const key of ['x','y','x2','y2','pinch','twist']){const n=item.touch?.[key];if(Number.isInteger(n)&&n>=-2&&n<def.params.length)touch[key]=n;}touch.spring=item.touch?.spring===true;
-    out.push({...(def.id==='hue'?{modulations:normalizeModulations(item.modulations,3)}:{}),id:def.id,intensity:Number.isFinite(item.intensity)?clamp(item.intensity):1,locked:item.locked===true,hold:false,touch,enabled:item.enabled===true,reactive:item.reactive===true,reactiveParam:Number.isInteger(item.reactiveParam)&&item.reactiveParam>=0&&item.reactiveParam<def.params.length?item.reactiveParam:0,values:def.params.map((p,i)=>Number.isFinite(item.values?.[i])?clamp(item.values[i]):p.value)});
+    out.push({...(['hue','mirror'].includes(def.id)?{modulations:normalizeModulations(item.modulations,3)}:{}),id:def.id,intensity:Number.isFinite(item.intensity)?clamp(item.intensity):1,locked:item.locked===true,hold:false,touch,enabled:item.enabled===true,reactive:item.reactive===true,reactiveParam:Number.isInteger(item.reactiveParam)&&item.reactiveParam>=0&&item.reactiveParam<def.params.length?item.reactiveParam:0,values:def.params.map((p,i)=>Number.isFinite(item.values?.[i])?clamp(item.values[i]):p.value)});
   }
   return out;
 }

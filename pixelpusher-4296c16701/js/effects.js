@@ -152,7 +152,9 @@ EFFECTS.push({
   ],
 });
 
+EFFECTS.push({id:'mirror',name:'Mirror',tag:'REFLECTION',mode:19,params:[{name:'Mode',value:0,max:4,step:1,options:['Left → Right','Right → Left','Top → Bottom','Bottom → Top','Quad']},p('Line',.5),p('Mix',1)]});
 export function formatParam(param, value) {
+  if(param?.options)return param.options[Math.round(value*(param.max||1))]||param.options[0];
   return param?.unit === "°"
     ? Math.round(value * 360) + "°"
     : param?.unit === "Hz"

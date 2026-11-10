@@ -1,4 +1,4 @@
-import { valueGauge } from './ui-material.js';
+import { valueGauge, effectSwitch, bindRingDial } from './ui-material.js';
 import { formatParam } from "./effects.js";
 import {
   CATALOG,
@@ -525,8 +525,9 @@ export class PerformanceConsole {
       () => this.openInspector(def.id),
       "tile-tune",
     );
-    card.append(trigger, tune);
-    const entry = { card, trigger, title, state, tune };
+    const toggleSwitch=effectSwitch('Enable '+def.name,()=>this.toggle(def.id));toggleSwitch.classList.add('tile-switch');
+    const chip=el('span','tile-chip');chip.setAttribute('aria-hidden','true');card.append(trigger,tune,chip,toggleSwitch);
+    const entry = { card, trigger, title, state, tune, toggleSwitch };
     this.tiles.set(def.id, entry);
     return entry;
   }
@@ -583,6 +584,7 @@ export class PerformanceConsole {
       ].join("|");
       if (t.signature === signature) continue;
       t.signature = signature;
+      t.toggleSwitch.setAttribute("aria-checked",String(status==="on"));t.toggleSwitch.dataset.state=status;
       t.card.classList.toggle("is-on", status === "on");
       t.card.classList.toggle("is-mixed", status === "mix");
       t.card.classList.toggle("is-selected", selected);
@@ -630,7 +632,7 @@ export class PerformanceConsole {
       if (document.activeElement !== f.input) {
         const value = f.get();
         f.input.value = value * f.scale;
-        f.out.textContent = f.format(value);
+        f.out.textContent = f.format(value);f.gauge?.update(value,f.format(value));
       }
     }
     if (
@@ -664,8 +666,8 @@ export class PerformanceConsole {
     if (!d) return;
     if (this.selection.has(id)) this.selection.delete(id);
     else {
-      if (this.selection.size >= 19) {
-        this.note("A group can have up to 19 members.", true);
+      if (this.selection.size >= 20) {
+        this.note("A group can have up to 20 members.", true);
         return;
       }
       if (d.kind === "shader")
@@ -754,22 +756,25 @@ export class PerformanceConsole {
     input.type = "range";
     input.min = 0;
     input.max = scale;
-    input.step = scale === 360 ? 1 : 0.01;
+    input.step = meta?.step || (scale === 360 ? 1 : 0.01);
     input.value = get() * scale;
     input.id = id;
     input.setAttribute("aria-label", label);
     caption.append(out);
+    const gauge=body.id==='performance-panel-body'&&!meta?.options?valueGauge(label,this.syncFields.length%3===0?'accent':this.syncFields.length%3===1?'red':'blue'):null;
+    if(gauge){wrap.classList.add('has-param-ring');gauge.update(get(),format(get()));wrap.append(gauge.node);bindRingDial(gauge,input,get,label);}
     input.addEventListener("input", () => {
-      set(Number(input.value) / scale);
+      set(Number(input.value) / scale);gauge?.update(get(),format(get()));
       out.textContent = format(Number(input.value) / scale);
       this.changed();
     });
     wrap.append(caption, input);
     body.append(wrap);
-    this.syncFields.push({ input, out, get, scale, format });
+    this.syncFields.push({ input, out, get, scale, format,gauge });
     return input;
   }
   openInspector(id, target = true) {
+    document.dispatchEvent(new Event("effect-inspector"));
     if (this.selecting) this.endSelection();
     const d = CATALOG_BY_ID.get(id),
       g = this.groups.find((g) => g.id === id);
@@ -951,15 +956,15 @@ export class PerformanceConsole {
     );
     mappings.append(springLabel);
     body.append(mappings);
-    if (g || effect.id === "hue") {
-      const prefix = g ? "group" : "hue",
+    if (g || ["hue","mirror"].includes(effect.id)) {
+      const prefix = g ? "group" : effect.id,
         mods = el("details", "console-details");
       mods.id = prefix + "-modulations";
       mods.append(
         el(
           "summary",
           null,
-          g ? "Macro / XY modulation" : "Hue · LFO / audio / BPM",
+          g ? "Macro / XY modulation" : d.name+" · LFO / audio / BPM",
         ),
       );
       params.forEach((p, i) => {

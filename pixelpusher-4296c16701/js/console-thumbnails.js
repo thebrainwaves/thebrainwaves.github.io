@@ -38,7 +38,8 @@ export function thumbnail(id) {
     points.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b)));
     x.stroke();
   };
-  if (id === "hue") {
+  if(id==='mirror'){for(let i=0;i<5;i++){x.strokeStyle=i%2?'#8e62eb':'#e9404c';x.strokeRect(12+i*5,10+i*4,40-i*6,44-i*7);x.strokeRect(60+i*2,10+i*4,40-i*6,44-i*7);}x.strokeStyle='#c1a0ff';x.beginPath();x.moveTo(56,4);x.lineTo(56,60);x.stroke();}
+ else if (id === "hue") {
     for (let ring = 0; ring < 3; ring++)
       for (let arc = 0; arc < 4; arc++) {
         x.strokeStyle = colors[arc % colors.length];

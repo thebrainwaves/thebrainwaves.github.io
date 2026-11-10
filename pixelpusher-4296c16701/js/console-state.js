@@ -5,7 +5,7 @@ import {
   modulatedValues,
   SHADER_SCENES,
 } from "./shader-state.js";
-export const MAX_GROUP_ROUTES = 96;
+export const MAX_GROUP_ROUTES = 100;
 const clamp = (n, a = 0, b = 1) => Math.min(b, Math.max(a, n));
 const num = (n, f = 0.5) => (Number.isFinite(n) ? clamp(n) : f);
 const ROUTE_INDEX = { macro: 0, x: 1, y: 2 };
@@ -22,7 +22,7 @@ export function normalizeMembers(raw) {
   let shader = false;
   for (const id of Array.isArray(raw) ? raw.slice(0, 64) : []) {
     const def = CATALOG_BY_ID.get(id);
-    if (!def || members.includes(id) || members.length >= 19) continue;
+    if (!def || members.includes(id) || members.length >= 20) continue;
     if (def.kind === "shader") {
       if (shader) continue;
       shader = true;
@@ -379,7 +379,7 @@ export class ConsoleEngine {
       const src = model.stack[i],
         out = result.stack[i],
         gain = this.gain("effects", src.id, src.enabled, p);
-      if (out.id === "hue") modulatedValues(out, time, bands, out.values);
+      if (["hue","mirror"].includes(out.id)) modulatedValues(out, time, bands, out.values);
       out.enabled = gain > 0;
       out.intensity *= gain;
     }

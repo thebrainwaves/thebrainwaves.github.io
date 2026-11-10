@@ -13,4 +13,5 @@
 <symbol id="undo" viewBox="0 0 24 24"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 0 12" transform="translate(0 -2)"/></symbol>
 <symbol id="redo" viewBox="0 0 24 24"><path d="m15 5 5 5-5 5m5-5H10a6 6 0 0 0 0 12" transform="translate(0 -2)"/></symbol>
 <symbol id="export" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 14v7h16v-7"/></symbol>
+<symbol id="draw" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L20 8l-4-4zM13 7l4 4M4 16l4 4"/></symbol>
 </svg>

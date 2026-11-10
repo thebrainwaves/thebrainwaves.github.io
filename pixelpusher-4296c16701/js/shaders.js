@@ -3,6 +3,8 @@ export const body=`
 precision highp float;
 VARYING vec2 vUV;
 uniform sampler2D uFrame;
+uniform sampler2D uInk;
+uniform float uInkMix;
 uniform sampler2D uHistory;
 uniform sampler2D uPrevious;
 uniform sampler2D uRing0;
@@ -152,5 +154,14 @@ void main(){
    else rotated=vec3(span,0.,span*(1.-f));
    c=mix(original,rotated+vec3(low),d);
  }
+ if(uMode==19){
+   float mode=floor(a*4.+.5);vec2 p=uv;float line=b,vertical=1.-b;
+   if(mode<.5||mode>3.5){if(p.x>line)p.x=2.*line-p.x;}
+   else if(mode<1.5){if(p.x<line)p.x=2.*line-p.x;}
+   if((mode>1.5&&mode<2.5)||mode>3.5){if(p.y<vertical)p.y=2.*vertical-p.y;}
+   else if(mode>2.5&&mode<3.5){if(p.y>vertical)p.y=2.*vertical-p.y;}
+   c=mix(original,sampleAt(p),d);
+ }
+ if(uMode==0&&uInkMix>0.){vec4 ink=TEX(uInk,safe(uv));c=mix(c,ink.rgb,ink.a*uInkMix);}
  COLOR=vec4(clamp(mix(original,c,uMode==0?1.:uIntensity),0.,1.),1.);
 }`;
