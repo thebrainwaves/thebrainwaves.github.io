@@ -1,12 +1,11 @@
-// Versioned app-shell cache only. Never caches user media or remote requests.
-const CACHE='brainhertz-glitch-v1.0.0';
-const ASSETS=['./','./index.html','./style.css','./manifest.webmanifest','./js/core.js','./js/gpu.js','./js/audio.js','./js/recorder.js','./js/app.js','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
-self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('brainhertz-glitch-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
-self.addEventListener('fetch',event=>{
- const url=new URL(event.request.url);
- if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
- const allowed=ASSETS.some(path=>new URL(path,self.registration.scope).href===url.href);
- if(!allowed)return;
- event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(event.request))||fetch(event.request)));
-});
+// Retirement worker. Deploy ONLY in the old launcher folder, never at origin root.
+const DESTINATION='/pixelpusher-4296c16701/';
+self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
+self.addEventListener('activate',event=>event.waitUntil((async()=>{
+ // Remove only the retired pre-rename app-shell caches; never touch the new app's cache.
+ await Promise.all((await caches.keys()).filter(key=>key.startsWith('brainhertz-glitch-')).map(key=>caches.delete(key)));
+ await self.clients.claim();
+ const windows=await self.clients.matchAll({type:'window'});
+ await self.registration.unregister();
+ await Promise.all(windows.map(client=>client.navigate(DESTINATION)));
+})()));

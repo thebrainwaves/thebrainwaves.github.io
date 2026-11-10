@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#090b10">
+<meta name="apple-mobile-web-app-title" content="Pixel Pusher">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="An on-device visual instrument by Brainhertz Productions. Original GPU effects, photos and video. No uploads.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./style.css">
+<title>Pixel Pusher — Brainhertz Productions</title>
+<script type="module" src="./js/app.js"></script>
+</head>
+<body>
+<div class="app">
+<header class="topbar"><div class="brand"><img src="./icons/icon.svg" width="30" height="30" alt="Pixel Pusher icon"><div><h1>PIXEL PUSHER<span class="version"> / v1.1</span></h1><p>BRAINHERTZ PRODUCTIONS</p></div></div><button id="privacy" class="local-status" aria-label="Show privacy and offline information"><span class="dot"></span> ON DEVICE</button></header>
+<main>
+<section class="sourcebar" aria-label="Visual source">
+<label class="button primary file-label">Import media<input id="file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/*"></label>
+<button id="camera">Camera</button><button id="flip" aria-label="Switch front or rear camera" disabled>Flip</button>
+</section>
+<div class="stage-info"><span id="source-name">INTERNAL SIGNAL / DEMO</span><span id="engine">STARTING</span></div>
+<section class="stage" aria-label="Live effects preview">
+<canvas id="output" width="540" height="960" aria-label="Processed visual preview"></canvas>
+<div id="touch-overlay" aria-hidden="true"></div><div id="touch-status" aria-live="off"></div><button id="stop-touch" hidden>Stop <span id="touch-timer">00:00</span></button>
+<div class="stage-corners" aria-hidden="true"></div>
+<div class="stage-top"><span id="live-label">LIVE PROCESSING</span><span id="dimensions">540 × 960</span></div>
+<div id="record-badge" hidden><span class="dot"></span> REC <output id="elapsed">00:00</output></div>
+<div class="stage-bottom"><button id="play" hidden>Pause clip</button><button id="compare" aria-pressed="false">Hold / original</button></div>
+</section>
+<div class="presetbar"><label for="preset">LOOK</label><select id="preset" aria-label="Preset"></select><button id="randomize" aria-label="Randomize effects">Shuffle</button><button id="reset" aria-label="Reset all effects">Reset</button></div>
+<nav class="tabs" aria-label="Control sections"><button data-tab="stack" aria-selected="true">01 <span>Stack</span></button><button data-tab="audio" aria-selected="false">02 <span>Audio</span></button><button data-tab="export" aria-selected="false">03 <span>Output</span></button></nav>
+<section id="panel-stack" class="panel" aria-label="Effect stack">
+<div class="section-head"><h2>Signal chain</h2><span>TOP → BOTTOM</span></div>
+<p class="hint">Tap an effect to tune. Enable layers and move them in the chain.</p>
+<label class="toggle-line"><input id="touch-multi" type="checkbox">Picture controls all enabled layers</label><p class="hint">Picture: drag = XY · two fingers = XY2 / pinch / twist · tap = stutter · hold = freeze. Selected layer is the default target.</p><div id="stack"></div>
+<div class="save-preset"><label for="preset-name">Save your look</label><div><input id="preset-name" maxlength="40" placeholder="Name this look" autocomplete="off"><button id="save-preset">Save</button></div></div>
+</section>
+<section id="panel-audio" class="panel" aria-label="Audio controls" hidden>
+<div class="section-head"><h2>Sound → motion</h2><span>LOCAL ANALYSER</span></div>
+<p class="hint">Sound modulates the selected slider of each layer marked “Audio drive”. Microphone sound is never played through your speakers.</p>
+<label class="field">Audio for analysis + recording<select id="audio-source"><option value="none">Silent / no audio</option><option value="video">Imported clip audio</option><option value="mic">Microphone</option><option value="mix">Clip + microphone</option></select></label>
+<label class="toggle-line"><input type="checkbox" id="reactive">Enable audio-reactive motion</label>
+<label class="slider-label" for="sensitivity">Sensitivity <output id="sensitivity-value">1.5×</output></label><input id="sensitivity" type="range" min="0.25" max="5" step="0.05" value="1.5">
+<label class="field meter-label">Input level<meter id="meter" min="0" max="1" value="0"></meter></label>
+<p id="audio-status" class="hint">Audio off. No microphone access requested.</p>
+<div class="tempo"><button id="tap-tempo">Tap tempo</button><output id="bpm">120 BPM / auto onset</output><button id="auto-tempo">Auto onset</button></div><p class="hint">Pulse gate can flash. Photosensitivity warning: leave it OFF if flashing light affects you. It is excluded from Shuffle.</p><button id="mute-monitor">Clip monitor: on</button>
+</section>
+<section id="panel-export" class="panel" aria-label="Export settings" hidden>
+<div class="section-head"><h2>Make a signal</h2><span>REAL-TIME EXPORT</span></div>
+<div class="field-grid"><label class="field">Output size<select id="quality"><option value="540">540p / balanced</option><option value="720">720p / detailed</option><option value="1080">1080p / high load</option></select></label><label class="field">Frame<select id="aspect"><option value="portrait">9:16 / vertical</option><option value="square">1:1 / square</option><option value="landscape">16:9 / wide</option></select></label></div>
+<label class="toggle-line"><input type="checkbox" id="auto-quality" checked>Adaptive preview resolution</label><p id="perf-status" class="hint">Auto quality active. Capture locks the current dimensions.</p><label class="field">Recording limit (3–300 seconds)<input id="limit" type="number" inputmode="numeric" min="3" max="300" step="1" value="60"></label>
+<p class="hint">Default 60s. Longer takes depend on device memory and heat. Stops at 256 MB, when interrupted, or when you leave this app. Keep the screen awake.</p>
+<div class="loop-box"><h3>Photo → moving image</h3><p class="hint">A still becomes a timed animated take. Feedback looks may have a seam; this is not a guaranteed seamless loop.</p><div class="loop-actions"><select id="loop-duration" aria-label="Photo loop duration"><option value="3">3 seconds</option><option value="6" selected>6 seconds</option><option value="10">10 seconds</option></select><button id="photo-loop">Record photo loop</button></div></div>
+<div class="section-head"><h3>Exports</h3><span id="format">DETECTING FORMAT</span></div><div id="exports"><p class="hint" id="no-exports">Exports appear here. Save them before closing this app.</p></div>
+</section>
+<div id="notice" class="notice" role="status" aria-live="polite">Private by design. Import a source or explore the internal signal.</div>
+<footer class="credits">ORIGINAL VISUAL INSTRUMENT · V1.1.0<br><span id="offline-status">Offline shell loading…</span></footer>
+</main>
+<div class="recordbar"><button id="snapshot" aria-label="Export PNG snapshot">PNG<span>Snapshot</span></button><button id="record" class="record"><span class="record-symbol"></span><span id="record-text">Record video</span></button></div>
+</div>
+<video id="media" class="source-media" playsinline muted loop preload="auto"></video>
+<dialog id="privacy-dialog"><h2>Only on this device.</h2><p>Photos, videos, camera frames and audio stay in this app. No accounts, analytics, uploads, external services or third-party runtime code.</p><p>Only named presets are stored locally. Exports remain in memory until saved. The app shell is cached for offline use; the browser may clear it.</p><p>Camera and microphone need HTTPS (or localhost for local development), plus your permission. Install from Safari using Share → Add to Home Screen once a host is approved.</p><button id="close-privacy">Back to instrument</button></dialog>
+</body>
+</html>

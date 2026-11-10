@@ -1,4 +1,6 @@
-import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,normalizePreset,normalizeLimit} from './core.js';
+import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,normalizePreset,normalizeLimit,randomizeStack,QualityController,BeatClock} from './core.js';
+import {readPresets,PRESET_KEY} from './storage.js';
+import {PictureController,bindXY} from './touch.js';
 import {Renderer} from './gpu.js';
 import {AudioEngine} from './audio.js';
 import {Capture,recordingMime} from './recorder.js';
@@ -6,7 +8,8 @@ const $=id=>document.getElementById(id);
 const canvas=$('output'),video=$('media'),audio=new AudioEngine(video);
 let renderer,stack=defaultStack(),selected='rgb',sourceKind='demo',sourceURL=null,camera=null,facing='environment',sourceBusy=false;
 let source,compare=false,reactive=false,sensitivity=1.5,lastFrame=0,loopStart=null,loopLength=6,recordKind='video',wakeLock=null,renderFailed=false;
-const exports=[],KEY='brainhertz.glitch.presets.v1';
+const quality=new QualityController(),beatClock=new BeatClock();let frameAverage=16,lastMeasured=0;
+const exports=[],KEY=PRESET_KEY;
 const note=(message,error=false)=>{$('notice').textContent=message;$('notice').classList.toggle('error',error);};
 const safe=fn=>async(...args)=>{try{await fn(...args);}catch(e){note(e.message||'This operation could not complete.',true);}};
 const node=(tag,className,text)=>{const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
@@ -24,7 +27,7 @@ function drawDemo(t){
 }
 drawDemo(0);source=demo;
 let userPresets=[];
-try{const raw=localStorage.getItem(KEY);if(raw&&raw.length<65536){const parsed=JSON.parse(raw);if(Array.isArray(parsed))userPresets=parsed.slice(0,20).map(normalizePreset).filter(Boolean);}}catch{note('Local preset storage is unavailable. Exports still work.');}
+try{const saved=readPresets(localStorage);userPresets=saved.presets;if(saved.warning)note('Some local preset storage is unavailable. Existing saved looks are preserved.');else if(saved.migrated)note('Saved looks migrated to Pixel Pusher. Originals preserved.');}catch{note('Local preset storage is unavailable. Exports still work.');}
 function updatePresets(){
  const s=$('preset');s.replaceChildren();
  const custom=node('option',null,'Custom look');custom.value='custom';s.append(custom);
@@ -40,9 +43,17 @@ function renderStack(){
   toggle.addEventListener('click',()=>{effect.enabled=!effect.enabled;$('preset').value='custom';renderStack();});
   const title=node('button','effect-title',def.name);title.append(node('small',null,def.tag));title.setAttribute('aria-expanded',String(selected===effect.id));title.addEventListener('click',()=>{selected=selected===effect.id?null:effect.id;renderStack();});
   const up=node('button','move','↑'),down=node('button','move','↓');up.setAttribute('aria-label','Move '+def.name+' up');down.setAttribute('aria-label','Move '+def.name+' down');up.disabled=i===0;down.disabled=i===stack.length-1;
-  up.addEventListener('click',()=>{stack=moveEffect(stack,i,-1);$('preset').value='custom';renderer.clearHistory();renderStack();});down.addEventListener('click',()=>{stack=moveEffect(stack,i,1);$('preset').value='custom';renderer.clearHistory();renderStack();});head.append(toggle,title,up,down);card.append(head);
+  up.addEventListener('click',()=>{stack=moveEffect(stack,i,-1);$('preset').value='custom';renderer.clearHistory();renderStack();});down.addEventListener('click',()=>{stack=moveEffect(stack,i,1);$('preset').value='custom';renderer.clearHistory();renderStack();});const lock=node('button','lock-effect',effect.locked?'LOCK':'FREE');lock.setAttribute('aria-label','Lock '+def.name+' for shuffle');lock.setAttribute('aria-pressed',String(effect.locked));lock.addEventListener('click',()=>{effect.locked=!effect.locked;renderStack();});head.append(toggle,title,lock,up,down);card.append(head);
   if(selected===effect.id){
    const controls=node('div','effect-controls');
+   const intensityLabel=node('label','slider-label','Intensity'),intensityOut=node('output',null,Math.round(effect.intensity*100)+'%'),intensity=node('input');intensityLabel.htmlFor=effect.id+'-intensity';intensityLabel.append(intensityOut);intensity.id=effect.id+'-intensity';intensity.type='range';intensity.min=0;intensity.max=1;intensity.step=.01;intensity.value=effect.intensity;intensity.addEventListener('input',()=>{effect.intensity=Number(intensity.value);intensityOut.textContent=Math.round(effect.intensity*100)+'%';$('preset').value='custom';});controls.append(intensityLabel,intensity);
+   const pad=node('div','xy-pad','XY / touch or arrow keys');pad.tabIndex=0;pad.setAttribute('role','group');pad.setAttribute('aria-label',def.name+' XY touch pad');bindXY(pad,effect,syncTouchInputs);controls.append(pad);
+   const mapping=node('details','touch-mapping'),summary=node('summary',null,'Touch / picture mappings'),grid=node('div','mapping-grid');mapping.append(summary,grid);
+   for(const [key,name]of [['x','Finger 1 X'],['y','Finger 1 Y'],['x2','Finger 2 X'],['y2','Finger 2 Y'],['pinch','Pinch'],['twist','Twist']]){const label=node('label','field',name),select=node('select','touch-map-'+key);select.setAttribute('aria-label',def.name+' '+name);for(const [v,label]of [[-2,'Unassigned'],[-1,'Intensity']]){const o=node('option',null,label);o.value=v;select.append(o);}def.params.forEach((p,i)=>{const o=node('option',null,p.name);o.value=i;select.append(o);});select.value=effect.touch[key];select.addEventListener('change',()=>{effect.touch[key]=Number(select.value);$('preset').value='custom';});label.append(select);grid.append(label);}
+   const springLabel=node('label','toggle-line'),spring=node('input','touch-spring');spring.type='checkbox';spring.checked=effect.touch.spring;spring.addEventListener('change',()=>{effect.touch.spring=spring.checked;});springLabel.append(spring,document.createTextNode('Spring back on release'));mapping.append(springLabel);controls.append(mapping);
+   if(effect.id==='smear'||effect.id==='trails'){const hold=node('button','hold-memory',effect.hold?'Release memory':'Hold memory');hold.setAttribute('aria-pressed',String(effect.hold));hold.addEventListener('click',()=>{effect.hold=!effect.hold;hold.textContent=effect.hold?'Release memory':'Hold memory';hold.setAttribute('aria-pressed',String(effect.hold));});controls.append(hold);}
+   if(effect.id==='beat')controls.append(node('p','hint','Flashing light warning. Opt-in only. Audio onset or Tap tempo drives pulse timing.'));
+
    def.params.forEach((param,j)=>{const id=effect.id+'-'+j,label=node('label','slider-label',param.name);label.htmlFor=id;const out=node('output',null,Math.round(effect.values[j]*100)+'%');label.append(out);const input=node('input');input.type='range';input.id=id;input.min=0;input.max=1;input.step=.01;input.value=effect.values[j];input.addEventListener('input',()=>{effect.values[j]=Number(input.value);out.textContent=Math.round(effect.values[j]*100)+'%';$('preset').value='custom';});controls.append(label,input);});
    const label=node('label','toggle-line'),input=node('input');input.type='checkbox';input.checked=effect.reactive;input.addEventListener('change',()=>{effect.reactive=input.checked;$('preset').value='custom';});label.append(input,document.createTextNode('Audio drive'));controls.append(label);
    const targetLabel=node('label','field','Audio target'),target=node('select');target.setAttribute('aria-label',def.name+' audio target');def.params.forEach((param,j)=>{const option=node('option',null,param.name);option.value=String(j);target.append(option);});target.value=String(effect.reactiveParam||0);target.addEventListener('change',()=>{effect.reactiveParam=Number(target.value);$('preset').value='custom';});targetLabel.append(target);controls.append(targetLabel);card.append(controls);
@@ -50,13 +61,15 @@ function renderStack(){
   wrap.append(card);
  });
 }
+function syncTouchInputs(){for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){input.value=v;const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=Math.round(v*100)+'%';}});}$('preset').value='custom';}
+const picture=new PictureController(canvas,$('touch-overlay'),{getEffects:()=>stack.filter(e=>$('touch-multi').checked?e.enabled:e.id===selected),onChange:syncTouchInputs,onFreeze:value=>{if(renderer)renderer.freeze=value;},onStutter:()=>{if(renderer)renderer.stutterUntil=performance.now()+160;},status:$('touch-status')});
 function showTab(tab){document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));for(const name of ['stack','audio','export'])$('panel-'+name).hidden=name!==tab;}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
 function setCompare(value){compare=value;$('compare').setAttribute('aria-pressed',String(value));$('live-label').textContent=value?'ORIGINAL / BYPASS':'LIVE PROCESSING';}
 $('compare').addEventListener('pointerdown',e=>{e.preventDefault();$('compare').setPointerCapture(e.pointerId);setCompare(true);});for(const e of ['pointerup','pointercancel','lostpointercapture'])$('compare').addEventListener(e,()=>setCompare(false));
 $('compare').addEventListener('contextmenu',e=>e.preventDefault());$('compare').addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter'){e.preventDefault();setCompare(true);}});$('compare').addEventListener('keyup',()=>setCompare(false));$('compare').addEventListener('blur',()=>setCompare(false));window.addEventListener('blur',()=>setCompare(false));
 $('preset').addEventListener('change',()=>{const [type,index]=$('preset').value.split(':');const preset=type==='built'?PRESETS[Number(index)]:userPresets[Number(index)];if(preset){stack=sanitizeStack(preset.stack);renderer.clearHistory();renderStack();note(preset.name+' loaded.');}});
-$('randomize').addEventListener('click',()=>{stack=defaultStack().map(e=>({...e,enabled:Math.random()>.55,values:e.values.map(()=>.08+Math.random()*.65)}));renderer.clearHistory();$('preset').value='custom';renderStack();note('New signal chain generated.');});
+$('randomize').addEventListener('click',()=>{stack=randomizeStack(stack);renderer.clearHistory();$('preset').value='custom';renderStack();note('New signal chain generated.');});
 $('reset').addEventListener('click',()=>{stack=defaultStack().map(e=>({...e,enabled:false,reactive:false}));renderer.clearHistory();$('preset').value='custom';renderStack();note('All effects bypassed. Your source is unchanged.');});
 $('save-preset').addEventListener('click',safe(()=>{if(userPresets.length>=20)throw new Error('20 saved looks reached. Existing looks are preserved.');const name=$('preset-name').value.trim();if(!name)throw new Error('Give this look a name first.');const preset=normalizePreset({name,stack});const next=[...userPresets,preset];localStorage.setItem(KEY,JSON.stringify(next));userPresets=next;updatePresets();$('preset').value='user:'+(userPresets.length-1);$('preset-name').value='';note('Look saved on this device.');}));
 function stopCamera(){if(camera){camera.getTracks().forEach(t=>t.stop());camera=null;}$('flip').disabled=true;$('camera').textContent='Camera';}
@@ -110,26 +123,27 @@ $('audio-source').addEventListener('change',safe(async()=>{
 $('reactive').addEventListener('change',()=>{reactive=$('reactive').checked;if(reactive&&!stack.some(e=>e.reactive)){const first=stack.find(e=>e.enabled)||stack[0];first.reactive=true;renderStack();}note(reactive?'Audio drive enabled. Mark layers in the stack; select mic or clip audio to feed them.':'Audio-driven motion off. Recording audio routing is unchanged.');});
 $('sensitivity').addEventListener('input',()=>{sensitivity=Number($('sensitivity').value);$('sensitivity-value').textContent=sensitivity.toFixed(2)+'×';});
 $('mute-monitor').addEventListener('click',()=>{audio.monitorClip(!audio.monitor);$('mute-monitor').textContent='Clip monitor: '+(audio.monitor?'on':'off');});
-function resize(){const short=Number($('quality').value),aspect=$('aspect').value;const [w,h]=aspect==='portrait'?[short,Math.round(short*16/9)]:aspect==='landscape'?[Math.round(short*16/9),short]:[short,short];renderer.resize(w,h);$('dimensions').textContent=w+' × '+h;}
-for(const id of ['quality','aspect'])$(id).addEventListener('change',safe(resize));
+function resize(reset=true){if(reset)quality.reset();const short=Math.max(216,Math.round(Number($('quality').value)*quality.scale)),aspect=$('aspect').value;const [w,h]=aspect==='portrait'?[short,Math.round(short*16/9)]:aspect==='landscape'?[Math.round(short*16/9),short]:[short,short];renderer.resize(w,h);$('dimensions').textContent=w+' × '+h;}
+for(const id of ['quality','aspect'])$(id).addEventListener('change',safe(()=>resize()));
 function recordingUI(active){
+ picture.cancel();document.body.classList.toggle('recording-mode',active);$('stop-touch').hidden=!active;if(active)window.scrollTo(0,0);
  $('record').classList.toggle('active',active);$('record-text').textContent=active?'Stop recording':'Record video';$('record-badge').hidden=!active;
- for(const id of ['quality','aspect','limit','loop-duration','audio-source'])$(id).disabled=active;
+ for(const id of ['quality','aspect','limit','loop-duration','audio-source','auto-quality'])$(id).disabled=active;
  syncSourceButtons();
 }
 async function keepAwake(){try{wakeLock=await navigator.wakeLock?.request('screen');}catch{/* Optional; visibility handling still stops safely. */}}
 function releaseWake(){wakeLock?.release().catch(()=>{});wakeLock=null;}
 function timeLabel(seconds){return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(Math.floor(seconds%60)).padStart(2,'0');}
 function addExport(blob,kind,description){
- const ext=kind==='png'?'png':blob.type.includes('mp4')?'mp4':'webm',name='glitch-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+ext,url=URL.createObjectURL(blob);
+ const ext=kind==='png'?'png':blob.type.includes('mp4')?'mp4':'webm',name='pixelpusher-'+new Date().toISOString().replace(/[-:]/g,'').replace('T','-').replace(/\.\d+Z$/,'Z')+'.'+ext,url=URL.createObjectURL(blob);
  const item=node('div','export-item'),info=node('p',null,description+' · '+(blob.size/1048576).toFixed(2)+' MB'),link=node('a',null,'Save '+ext.toUpperCase());link.href=url;link.download=name;link.target='_blank';link.rel='noopener';
  item.append(info,link);const file=new File([blob],name,{type:blob.type});
- if(navigator.canShare?.({files:[file]})){const share=node('button',null,'Save / share');share.addEventListener('click',safe(async()=>{try{await navigator.share({files:[file],title:'Glitch export'});}catch(e){if(e.name!=='AbortError')throw e;}}));item.append(share);}
+ if(navigator.canShare?.({files:[file]})){const share=node('button',null,'Save / share');share.addEventListener('click',safe(async()=>{try{await navigator.share({files:[file],title:'Pixel Pusher export'});}catch(e){if(e.name!=='AbortError')throw e;}}));item.append(share);}
  $('no-exports')?.remove();$('exports').prepend(item);exports.push({url,blob});
  note(description+' ready in Output. Save it before closing.');
 }
 const capture=new Capture(canvas,{
- onTick:(seconds)=>{$('elapsed').textContent=timeLabel(seconds);},
+ onTick:(seconds)=>{$('elapsed').textContent=timeLabel(seconds);$('touch-timer').textContent=timeLabel(seconds);},
  onFinish:({blob,duration,reason})=>{loopStart=null;releaseWake();recordingUI(false);addExport(blob,'video',(recordKind==='loop'?'Photo loop':'Video')+' / '+duration.toFixed(1)+'s / '+reason);showTab('export');},
  onError:error=>{loopStart=null;releaseWake();recordingUI(false);note(error.message,true);}
 });
@@ -140,9 +154,10 @@ async function startRecording(kind='video'){
  if(sourceKind==='video'){if(video.ended)video.currentTime=0;await video.play();}
  recordKind=kind;const seconds=kind==='loop'?Number($('loop-duration').value):normalizeLimit($('limit').value);$('limit').value=normalizeLimit($('limit').value);
  if(kind==='loop'){loopLength=seconds;loopStart=performance.now();}
- try{const mime=capture.start({audioTracks:audio.tracks(),seconds});$('format').textContent=mime.split(';')[0].toUpperCase();$('elapsed').textContent='00:00';recordingUI(true);keepAwake();note('Recording on-device. Keep this app visible; '+seconds+'s limit.');}
+ try{const mime=capture.start({audioTracks:audio.tracks(),seconds});$('format').textContent=mime.split(';')[0].toUpperCase();$('elapsed').textContent='00:00';$('touch-timer').textContent='00:00';recordingUI(true);keepAwake();note('Recording on-device. Keep this app visible; '+seconds+'s limit.');}
  catch(error){loopStart=null;throw error;}
 }
+$('stop-touch').addEventListener('click',()=>capture.stop());
 $('record').addEventListener('click',safe(async()=>{if(capture.active)capture.stop();else await startRecording();}));
 $('photo-loop').addEventListener('click',safe(async()=>{if(sourceKind==='video'||sourceKind==='camera')throw new Error('Import a still photo first.');if(!stack.some(e=>e.enabled))throw new Error('Enable an effect or choose a look first.');await startRecording('loop');}));
 $('snapshot').addEventListener('click',safe(async()=>{if(exports.length>=8)throw new Error('Save existing exports and reload before adding more.');const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw new Error('Snapshot failed. Try a lower output size.');addExport(blob,'png','PNG / '+canvas.width+' × '+canvas.height);showTab('export');}));
@@ -151,14 +166,17 @@ window.addEventListener('pagehide',()=>{capture.stop('page closed');stopCamera()
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();capture.stop('GPU interrupted');renderFailed=true;note('Graphics context lost. Waiting for recovery; try a lower output size.',true);});
 canvas.addEventListener('webglcontextrestored',safe(()=>{renderer=new Renderer(canvas);resize();renderFailed=false;note('Graphics recovered. Previous take was stopped safely.');}));
 $('privacy').addEventListener('click',()=>$('privacy-dialog').showModal());$('close-privacy').addEventListener('click',()=>$('privacy-dialog').close());
+$('tap-tempo').addEventListener('click',()=>{beatClock.tap(performance.now());$('bpm').textContent=Math.round(beatClock.bpm)+' BPM / tap';});
+$('auto-tempo').addEventListener('click',()=>{beatClock.manual=false;$('bpm').textContent='Audio onset / auto';});
+$('auto-quality').addEventListener('change',()=>{quality.reset();resize(false);});
 function frame(now){
- requestAnimationFrame(frame);if(renderFailed||document.hidden||now-lastFrame<1000/30)return;lastFrame=now;
- const level=audio.level(sensitivity);$('meter').value=level;
+ requestAnimationFrame(frame);if(renderFailed||document.hidden)return;const interval=lastFrame?now-lastFrame:16;lastFrame=now;
+ const level=audio.level(sensitivity);$('meter').value=level;const pulse=beatClock.update(level,now);
  let time=now/1000,animation=0;
  if(loopStart!==null){const phase=Math.min(1,(now-loopStart)/(loopLength*1000));time=phase*Math.PI*2;animation=Math.sin(phase*Math.PI*2);}
  if(sourceKind==='demo')drawDemo(time);
- try{renderer.render(source,stack,time,compare,{audio:reactive?level:0,animation});}catch(error){renderFailed=true;capture.stop('render interrupted');note('Rendering stopped: '+error.message,true);}
+ try{const start=performance.now();renderer.render(source,stack,time,compare,{audio:reactive?level:0,animation,beat:pulse,phase:beatClock.phase});const duration=performance.now()-start;frameAverage=frameAverage*.94+Math.max(duration,interval)*.06;if($('auto-quality').checked&&quality.update(Math.max(duration,interval),capture.active||picture.points.size>0))resize(false);if(now-lastMeasured>1000){lastMeasured=now;$('perf-status').textContent=Math.round(frameAverage)+' ms / '+Math.round(quality.scale*100)+'% resolution'+(capture.active?' · capture locked':' · adaptive preview');}}catch(error){renderFailed=true;capture.stop('render interrupted');note('Rendering stopped: '+error.message,true);}
 }
 try{renderer=new Renderer(canvas);$('engine').textContent='WEBGL '+renderer.version;updatePresets();renderStack();requestAnimationFrame(frame);try{$('format').textContent=recordingMime().split(';')[0].toUpperCase();}catch{$('format').textContent='PNG ONLY';}}
 catch(error){renderFailed=true;note(error.message,true);$('record').disabled=true;$('snapshot').disabled=true;}
-if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js').then(async registration=>{await navigator.serviceWorker.ready;$('offline-status').textContent='Offline shell ready · no media stored';registration.addEventListener('updatefound',()=>{$('offline-status').textContent='App update available on next launch';});}).catch(()=>{$('offline-status').textContent='Offline cache unavailable · app still works online';});}else $('offline-status').textContent='Offline install unavailable in this browser';
+if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(async registration=>{await navigator.serviceWorker.ready;$('offline-status').textContent='Offline shell ready · no media stored';registration.addEventListener('updatefound',()=>{$('offline-status').textContent='App update available on next launch';});}).catch(()=>{$('offline-status').textContent='Offline cache unavailable · app still works online';});}else $('offline-status').textContent='Offline install unavailable in this browser';
