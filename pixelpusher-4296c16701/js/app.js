@@ -1,3 +1,7 @@
+import {lowMaterialQuality} from './ui-material.js';
+import {EditorController} from './editor-ui.js';
+import {formatParam} from './effects.js';
+import {fileKind,decodePhoto} from './photo-source.js';
 import {PerformanceConsole} from './performance-console.js';
 import {ShaderUI} from './shader-ui.js';
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,normalizePreset,normalizeLimit,randomizeStack,QualityController,BeatClock} from './core.js';
@@ -9,10 +13,10 @@ import {AudioEngine} from './audio.js';
 import {Capture,recordingMime} from './recorder.js';
 const $=id=>document.getElementById(id);
 const canvas=$('output'),video=$('media'),audio=new AudioEngine(video);
-let performanceUI=null,consoleMutation=false;
+let performanceUI=null,consoleMutation=false,editor=null;
 let renderer,stack=defaultStack(),selected='rgb',sourceKind='demo',sourceURL=null,camera=null,facing='environment',sourceBusy=false;
 let source,compare=false,reactive=false,sensitivity=1.5,lastFrame=0,loopStart=null,loopLength=6,recordKind='video',wakeLock=null,renderFailed=false;
-const quality=new QualityController(),beatClock=new BeatClock();let frameAverage=16,lastMeasured=0;
+const quality=new QualityController(),beatClock=new BeatClock();let frameAverage=16,lastMeasured=0,lastRenderMs=16;
 const exports=[],KEY=PRESET_KEY;
 let toastTimer;
 const note=(message,error=false)=>{$('notice').textContent=message;$('notice').classList.toggle('error',error);const toast=$('performance-toast');if(toast){clearTimeout(toastTimer);toast.hidden=!error;if(error){toast.textContent=message;toastTimer=setTimeout(()=>toast.hidden=true,6500);}}};
@@ -59,19 +63,19 @@ function renderStack(){
    if(effect.id==='smear'||effect.id==='trails'){const hold=node('button','hold-memory',effect.hold?'Release memory':'Hold memory');hold.setAttribute('aria-pressed',String(effect.hold));hold.addEventListener('click',()=>{effect.hold=!effect.hold;hold.textContent=effect.hold?'Release memory':'Hold memory';hold.setAttribute('aria-pressed',String(effect.hold));});controls.append(hold);}
    if(effect.id==='beat')controls.append(node('p','hint','Flashing light warning. Opt-in only. Audio onset or Tap tempo drives pulse timing.'));
 
-   def.params.forEach((param,j)=>{const id=effect.id+'-'+j,label=node('label','slider-label',param.name);label.htmlFor=id;const out=node('output',null,Math.round(effect.values[j]*100)+'%');label.append(out);const input=node('input');input.type='range';input.id=id;input.min=0;input.max=1;input.step=.01;input.value=effect.values[j];input.addEventListener('input',()=>{effect.values[j]=Number(input.value);out.textContent=Math.round(effect.values[j]*100)+'%';$('preset').value='custom';});controls.append(label,input);});
+   def.params.forEach((param,j)=>{const id=effect.id+'-'+j,label=node('label','slider-label',param.name);label.htmlFor=id;const out=node('output',null,formatParam(param,effect.values[j]));label.append(out);const input=node('input');input.type='range';input.id=id;input.min=0;input.max=param.max||1;input.step=param.max===360?1:.01;input.value=effect.values[j]*(param.max||1);input.addEventListener('input',()=>{effect.values[j]=Number(input.value)/(param.max||1);out.textContent=formatParam(param,effect.values[j]);$('preset').value='custom';});controls.append(label,input);});
    const label=node('label','toggle-line'),input=node('input');input.type='checkbox';input.checked=effect.reactive;input.addEventListener('change',()=>{effect.reactive=input.checked;$('preset').value='custom';});label.append(input,document.createTextNode('Audio drive'));controls.append(label);
    const targetLabel=node('label','field','Audio target'),target=node('select');target.setAttribute('aria-label',def.name+' audio target');def.params.forEach((param,j)=>{const option=node('option',null,param.name);option.value=String(j);target.append(option);});target.value=String(effect.reactiveParam||0);target.addEventListener('change',()=>{effect.reactiveParam=Number(target.value);$('preset').value='custom';});targetLabel.append(target);controls.append(targetLabel);card.append(controls);
   }
   wrap.append(card);
  });
- recordView.renderQuick();performanceUI?.sync(true);
+ recordView.renderQuick();performanceUI?.sync(true);editor?.refresh();
 }
-function syncTouchInputs(){performanceUI?.sync(true);performanceUI?.schedule();recordView.sync();shaderUI.sync();for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){input.value=v;const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=Math.round(v*100)+'%';}});}$('preset').value='custom';}
+function syncTouchInputs(){editor?.observe('picture');performanceUI?.sync(true);performanceUI?.schedule();recordView.sync();shaderUI.sync();for(const effect of stack){const intensity=$(effect.id+'-intensity');if(intensity){intensity.value=effect.intensity;intensity.previousElementSibling.querySelector('output').textContent=Math.round(effect.intensity*100)+'%';}effect.values.forEach((v,j)=>{const input=$(effect.id+'-'+j);if(input){const param=EFFECTS.find(e=>e.id===effect.id).params[j];input.value=v*(param.max||1);const out=input.previousElementSibling?.querySelector('output');if(out)out.textContent=formatParam(param,v);}});}$('preset').value='custom';}
 const picture=new PictureController(canvas,$('touch-overlay'),{getEffects:()=>[...stack,shaderUI.state,...(performanceUI?.groups||[])].filter(e=>$('touch-multi').checked?e.enabled:e.id===selected),onChange:syncTouchInputs,onFreeze:value=>{if(renderer)renderer.freeze=value;},onStutter:()=>{if(renderer)renderer.stutterUntil=performance.now()+160;},status:$('touch-status')});
 const recordView=new RecordView(()=>[...stack,shaderUI.state,...(performanceUI?.groups||[])],syncTouchInputs);
-const shaderUI=new ShaderUI($('panel-shader'),{onChange:()=>{$('preset').value='custom';recordView.renderQuick();if(!consoleMutation)performanceUI?.externalChange();},onTarget:()=>{selected='shader';renderStack();}});
-performanceUI=new PerformanceConsole($('performance-dock'),{getModel:()=>({stack,shader:shaderUI.state}),getTarget:()=>selected,setShader:s=>{consoleMutation=true;try{shaderUI.setState(s);}finally{consoleMutation=false;}},onChange:reason=>{shaderUI.sync();if(selected?.startsWith('group:')&&!performanceUI.groups.some(g=>g.id===selected))selected=stack.find(e=>e.enabled)?.id||'rgb';if(['toggle','structure','scene'].includes(reason))renderStack();else syncTouchInputs();$('preset').value='custom';},onTarget:(id,render=true)=>{selected=id;if(render)renderStack();},onStudio:tab=>{document.body.classList.add('studio-open');$('studio-toggle').setAttribute('aria-pressed','true');if(recordView.recording&&recordView.view==='full')recordView.open(true);showTab(tab);},note,cancelPicture:()=>picture.cancel()});
+const shaderUI=new ShaderUI($('panel-shader'),{onChange:()=>{editor?.observe();$('preset').value='custom';recordView.renderQuick();if(!consoleMutation)performanceUI?.externalChange();},onTarget:()=>{selected='shader';renderStack();}});
+performanceUI=new PerformanceConsole($('performance-dock'),{getModel:()=>({stack,shader:shaderUI.state}),getTarget:()=>selected,setShader:s=>{consoleMutation=true;try{shaderUI.setState(s);}finally{consoleMutation=false;}},onChange:reason=>{editor?.observe();shaderUI.sync();if(selected?.startsWith('group:')&&!performanceUI.groups.some(g=>g.id===selected))selected=stack.find(e=>e.enabled)?.id||'rgb';if(['toggle','structure','scene'].includes(reason))renderStack();else syncTouchInputs();$('preset').value='custom';},onTarget:(id,render=true)=>{selected=id;if(render)renderStack();},onStudio:tab=>{editor?.setPro(true);document.body.classList.add('studio-open');$('studio-toggle').setAttribute('aria-pressed','true');if(recordView.recording&&recordView.view==='full')recordView.open(true);showTab(tab);},note,cancelPicture:()=>picture.cancel()});
 $('studio-toggle').addEventListener('click',()=>{const open=!document.body.classList.contains('studio-open');document.body.classList.toggle('studio-open',open);$('studio-toggle').setAttribute('aria-pressed',String(open));});
 const shaderBands={low:0,mid:0,high:0,beat:0,bpm:120,phase:0};
 function showTab(tab){if(tab==='shader'){selected='shader';renderStack();}else if(tab==='stack'&&selected==='shader'){selected=stack.find(e=>e.enabled)?.id||'rgb';renderStack();}document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));for(const name of ['stack','shader','audio','export'])$('panel-'+name).hidden=name!==tab;}
@@ -86,29 +90,29 @@ $('save-preset').addEventListener('click',safe(()=>{if(userPresets.length>=20)th
 function stopCamera(){if(camera){camera.getTracks().forEach(t=>t.stop());camera=null;}$('flip').disabled=true;$('camera').textContent='Camera';}
 function releaseSource(){stopCamera();video.pause();video.srcObject=null;video.removeAttribute('src');video.load();if(sourceURL){URL.revokeObjectURL(sourceURL);sourceURL=null;}$('play').hidden=true;}
 function sourceLabel(text){$('source-name').textContent=text;renderer.clearHistory();}
-function syncSourceButtons(){const busy=capture.active||sourceBusy;$('file').disabled=busy;$('camera').disabled=busy;$('flip').disabled=busy||!camera;$('photo-loop').disabled=busy||sourceKind==='video'||sourceKind==='camera';$('play').disabled=capture.active;}
-$('file').addEventListener('change',safe(async()=>{
- const file=$('file').files[0];if(!file)return;if(capture.active)return;
+function syncSourceButtons(){const busy=capture.active||sourceBusy;$('file').disabled=busy;$('photo').disabled=busy;$('camera').disabled=busy;$('flip').disabled=busy||!camera;$('photo-loop').disabled=busy||sourceKind==='video'||sourceKind==='camera';$('play').disabled=capture.active;}
+async function importMedia(input){
+ const file=input.files[0];if(!file)return;if(capture.active||sourceBusy)return;
  if(file.size>1024*1024*1024)throw new Error('Choose a source smaller than 1 GB for mobile safety.');
- if(!file.type.startsWith('image/')&&!file.type.startsWith('video/'))throw new Error('Choose a photo or video supported by this browser.');
+ const kind=fileKind(file);if(!kind)throw new Error('Choose a photo or video supported by this browser.');
  sourceBusy=true;syncSourceButtons();
- const url=URL.createObjectURL(file);
+ let url=null,photo=null;
  try{
-  if(file.type.startsWith('image/')){
-   const image=new Image();image.src=url;try{await image.decode();}catch{throw new Error('This image could not be decoded. Try JPEG, PNG or WebP (convert HEIC if needed).');}
-   if(image.naturalWidth>8192||image.naturalHeight>8192||image.naturalWidth*image.naturalHeight>32000000)throw new Error('Photo too large for the GPU. Resize it below 8192px and 32 megapixels.');
-   releaseSource();source=image;sourceKind='image';sourceURL=url;
+  if(kind==='image'){
+   photo=await decodePhoto(file,renderer.gl.getParameter(renderer.gl.MAX_TEXTURE_SIZE));
+   releaseSource();source=photo.source;sourceKind='image';
    if(audio.mode==='video'||audio.mode==='mix'){await audio.configure(audio.mode==='mix'?'mic':'none');$('audio-source').value=audio.mode;}
   }else{
-   releaseSource();sourceKind='video';sourceURL=url;video.src=url;video.muted=!(audio.mode==='video'||audio.mode==='mix');
+   url=URL.createObjectURL(file);releaseSource();sourceKind='video';sourceURL=url;video.src=url;video.muted=!(audio.mode==='video'||audio.mode==='mix');
    await new Promise((resolve,reject)=>{const ok=()=>{cleanup();resolve();},bad=()=>{cleanup();reject(new Error('Video codec not supported. Try an H.264 MP4.'));},timer=setTimeout(()=>{cleanup();reject(new Error('Video loading timed out. Choose a smaller clip.'));},15000);function cleanup(){clearTimeout(timer);video.removeEventListener('loadeddata',ok);video.removeEventListener('error',bad);}video.addEventListener('loadeddata',ok,{once:true});video.addEventListener('error',bad,{once:true});});
    if(video.videoWidth>8192||video.videoHeight>8192)throw new Error('Video resolution is too high. Use a smaller clip.');
    source=video;await video.play();$('play').hidden=false;$('play').textContent='Pause clip';
   }
-  sourceLabel(file.name);note('Local '+(sourceKind==='image'?'photo':'video')+' loaded. Nothing was uploaded.');
- }catch(error){URL.revokeObjectURL(url);releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');throw error;}
- finally{sourceBusy=false;$('file').value='';syncSourceButtons();}
-}));
+  sourceLabel(file.name);note('Local '+(sourceKind==='image'?'photo':'video')+' loaded.'+(photo&&(photo.originalWidth!==photo.width||photo.originalHeight!==photo.height)?' Resized to '+photo.width+' × '+photo.height+' for mobile safety.':'')+' Nothing was uploaded.');
+ }catch(error){if(url)URL.revokeObjectURL(url);releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');throw error;}
+ finally{sourceBusy=false;input.value='';syncSourceButtons();editor?.reset();}
+}
+for(const id of ['file','photo'])$(id).addEventListener('change',safe(()=>importMedia($(id))));
 async function openCamera(){
  if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera needs HTTPS (or localhost) and browser permission.');
  sourceBusy=true;syncSourceButtons();
@@ -119,9 +123,9 @@ async function openCamera(){
   if(audio.mode==='video'||audio.mode==='mix'){await audio.configure(audio.mode==='mix'?'mic':'none');$('audio-source').value=audio.mode;}
   $('camera').textContent='Stop cam';sourceLabel('CAMERA / '+(facing==='user'?'FRONT':'REAR'));note('Camera active on this device only. Select microphone separately if wanted.');
  }catch(error){releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');throw error;}
- finally{sourceBusy=false;syncSourceButtons();}
+ finally{sourceBusy=false;syncSourceButtons();editor?.reset();}
 }
-$('camera').addEventListener('click',safe(async()=>{if(camera){releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');syncSourceButtons();note('Camera stopped.');}else await openCamera();}));
+$('camera').addEventListener('click',safe(async()=>{if(camera){releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');syncSourceButtons();editor?.reset();note('Camera stopped.');}else await openCamera();}));
 $('flip').addEventListener('click',safe(async()=>{facing=facing==='environment'?'user':'environment';await openCamera();}));
 $('play').addEventListener('click',safe(async()=>{if(video.paused){await video.play();$('play').textContent='Pause clip';}else{video.pause();$('play').textContent='Play clip';}}));
 $('audio-source').addEventListener('change',safe(async()=>{
@@ -140,7 +144,7 @@ function recordingUI(active){
  picture.cancel();recordView.setActive(active);
  $('record').classList.toggle('active',active);$('record-text').textContent=active?'Stop recording':'Record video';$('record-badge').hidden=!active;
  for(const id of ['quality','aspect','limit','loop-duration','audio-source','auto-quality'])$(id).disabled=active;
- syncSourceButtons();
+ syncSourceButtons();editor?.refresh();
 }
 async function keepAwake(){try{wakeLock=await navigator.wakeLock?.request('screen');}catch{/* Optional; visibility handling still stops safely. */}}
 function releaseWake(){wakeLock?.release().catch(()=>{});wakeLock=null;}
@@ -150,7 +154,7 @@ function addExport(blob,kind,description){
  const item=node('div','export-item'),info=node('p',null,description+' · '+(blob.size/1048576).toFixed(2)+' MB'),link=node('a',null,'Save '+ext.toUpperCase());link.href=url;link.download=name;link.target='_blank';link.rel='noopener';
  item.append(info,link);const file=new File([blob],name,{type:blob.type});
  if(navigator.canShare?.({files:[file]})){const share=node('button',null,'Save / share');share.addEventListener('click',safe(async()=>{try{await navigator.share({files:[file],title:'Pixel Pusher export'});}catch(e){if(e.name!=='AbortError')throw e;}}));item.append(share);}
- $('no-exports')?.remove();$('exports').prepend(item);exports.push({url,blob});
+ $('no-exports')?.remove();$('exports').prepend(item);exports.push({url,blob,file,name,description});editor?.exportReady();
  note(description+' ready in Output. Save it before closing.');
 }
 const capture=new Capture(canvas,{
@@ -172,7 +176,7 @@ $('stop-touch').addEventListener('click',()=>capture.stop());
 $('record').addEventListener('click',safe(async()=>{if(capture.active)capture.stop();else await startRecording();}));
 $('photo-loop').addEventListener('click',safe(async()=>{if(sourceKind==='video'||sourceKind==='camera')throw new Error('Import a still photo first.');if(!shaderUI.state.enabled&&!stack.some(e=>e.enabled))throw new Error('Enable an effect or choose a look first.');await startRecording('loop');}));
 $('snapshot').addEventListener('click',safe(async()=>{if(exports.length>=8)throw new Error('Save existing exports and reload before adding more.');const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw new Error('Snapshot failed. Try a lower output size.');addExport(blob,'png','PNG / '+canvas.width+' × '+canvas.height);showTab('export');}));
-document.addEventListener('visibilitychange',()=>{if(document.hidden){capture.stop('app hidden');setCompare(false);if(camera){releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');syncSourceButtons();}audio.stopMic();if(audio.mode==='mic'||audio.mode==='mix'){audio.configure('none').catch(()=>{});$('audio-source').value='none';$('audio-status').textContent='Microphone stopped while app was hidden. Select it again to resume.';}}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){capture.stop('app hidden');setCompare(false);if(camera){releaseSource();source=demo;sourceKind='demo';sourceLabel('INTERNAL SIGNAL / DEMO');syncSourceButtons();editor?.reset();}audio.stopMic();if(audio.mode==='mic'||audio.mode==='mix'){audio.configure('none').catch(()=>{});$('audio-source').value='none';$('audio-status').textContent='Microphone stopped while app was hidden. Select it again to resume.';}}});
 window.addEventListener('pagehide',()=>{capture.stop('page closed');stopCamera();audio.stopMic();releaseWake();});
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();capture.stop('GPU interrupted');renderFailed=true;note('Graphics context lost. Waiting for recovery; try a lower output size.',true);});
 canvas.addEventListener('webglcontextrestored',safe(()=>{renderer=new Renderer(canvas);resize();renderFailed=false;note('Graphics recovered. Previous take was stopped safely.');}));
@@ -186,8 +190,14 @@ function frame(now){
  let time=now/1000,animation=0;
  if(loopStart!==null){const phase=Math.min(1,(now-loopStart)/(loopLength*1000));time=phase*Math.PI*2;animation=Math.sin(phase*Math.PI*2);}
  if(sourceKind==='demo')drawDemo(time);
- try{const start=performance.now();Object.assign(shaderBands,audio.bands(sensitivity),{beat:pulse,bpm:beatClock.bpm,phase:beatClock.phase});const composed=performanceUI.engine.compose({stack,shader:shaderUI.state},time,shaderBands,now);performanceUI.sync(false,now);const layered=compare||renderer.freeze?source:shaderUI.layer.render(source,composed.shader,time,{width:canvas.width,height:canvas.height,bands:shaderBands,frameMs:frameAverage});renderer.render(layered,composed.stack,time,compare,{audio:reactive?level:0,animation,beat:pulse,phase:beatClock.phase});const duration=performance.now()-start;frameAverage=frameAverage*.94+Math.max(duration,interval)*.06;if($('auto-quality').checked&&quality.update(Math.max(duration,interval),capture.active||picture.points.size>0))resize(false);if(now-lastMeasured>1000){lastMeasured=now;shaderUI.status();$('perf-status').textContent=Math.round(frameAverage)+' ms / '+Math.round(quality.scale*100)+'% resolution'+(capture.active?' · capture locked':' · adaptive preview');}}catch(error){renderFailed=true;capture.stop('render interrupted');note('Rendering stopped: '+error.message,true);}
+ try{if($('auto-quality').checked&&quality.update(Math.max(lastRenderMs,interval),capture.active||picture.points.size>0||sourceBusy))resize(false);const start=performance.now();Object.assign(shaderBands,audio.bands(sensitivity),{beat:pulse,bpm:beatClock.bpm,phase:beatClock.phase});const composed=performanceUI.engine.compose({stack,shader:shaderUI.state},time,shaderBands,now);performanceUI.sync(false,now);const layered=compare||renderer.freeze?source:shaderUI.layer.render(source,composed.shader,time,{width:canvas.width,height:canvas.height,bands:shaderBands,frameMs:frameAverage});renderer.render(layered,composed.stack,time,compare,{audio:reactive?level:0,animation,beat:pulse,phase:beatClock.phase});const duration=performance.now()-start;lastRenderMs=duration;frameAverage=frameAverage*.94+Math.max(duration,interval)*.06;if(now-lastMeasured>1000){lastMeasured=now;document.body.classList.toggle('low-ui-quality',lowMaterialQuality(document.body.classList.contains('low-ui-quality'),frameAverage,quality.scale));shaderUI.status();$('perf-status').textContent=Math.round(frameAverage)+' ms / '+Math.round(quality.scale*100)+'% resolution'+(capture.active?' · capture locked':' · adaptive preview');}}catch(error){renderFailed=true;capture.stop('render interrupted');note('Rendering stopped: '+error.message,true);}
 }
 try{renderer=new Renderer(canvas);$('engine').textContent='WEBGL '+renderer.version;updatePresets();renderStack();requestAnimationFrame(frame);try{$('format').textContent=recordingMime().split(';')[0].toUpperCase();}catch{$('format').textContent='PNG ONLY';}}
 catch(error){renderFailed=true;note(error.message,true);$('record').disabled=true;$('snapshot').disabled=true;}
+editor=new EditorController({canvas,console:performanceUI,note,recording:()=>capture.active,loading:()=>sourceBusy,
+ read:()=>({data:{stack,shader:shaderUI.state,console:performanceUI.getPresetState()},source,sourceKind,label:$('source-name').textContent}),
+ restore:s=>{picture.cancel();source=s.source;sourceKind=s.sourceKind;stack=sanitizeStack(s.data.stack);shaderUI.setState(s.data.shader);performanceUI.loadPreset(s.data.console);selected=stack.find(e=>e.enabled)?.id||'rgb';sourceLabel(s.label);renderStack();syncSourceButtons();},
+ canBake:()=>sourceKind==='image'&&!sourceBusy&&!capture.active&&(shaderUI.state.enabled||stack.some(e=>e.enabled)),
+ bake:async()=>{if(sourceKind!=='image')throw new Error('Import a photo to Apply / bake. Use Record for video.');if(capture.active||sourceBusy)throw new Error('Stop recording or wait for loading before baking a photo.');sourceBusy=true;syncSourceButtons();try{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const baked=document.createElement('canvas');baked.width=canvas.width;baked.height=canvas.height;const c=baked.getContext('2d');if(!c)throw new Error('Photo memory is unavailable. Try a smaller output size.');c.drawImage(canvas,0,0);source=baked;stack=stack.map(e=>({...e,enabled:false,hold:false}));shaderUI.setState({...shaderUI.state,enabled:false});performanceUI.reset();sourceLabel('BAKED / '+$('source-name').textContent.replace(/^BAKED \/ /,''));renderStack();note('Photo baked at '+baked.width+' × '+baked.height+'. Undo restores the original and its effects.');}finally{sourceBusy=false;syncSourceButtons();}},
+ reorder:(index,delta)=>{picture.cancel();performanceUI.externalChange();stack=moveEffect(stack,index,delta);renderer.clearHistory();renderStack();editor.observe();},getExports:()=>exports});
 if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(async registration=>{await navigator.serviceWorker.ready;$('offline-status').textContent='Offline shell ready · no media stored';registration.addEventListener('updatefound',()=>{$('offline-status').textContent='App update available on next launch';});}).catch(()=>{$('offline-status').textContent='Offline cache unavailable · app still works online';});}else $('offline-status').textContent='Offline install unavailable in this browser';

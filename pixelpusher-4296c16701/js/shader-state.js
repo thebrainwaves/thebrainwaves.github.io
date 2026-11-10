@@ -170,18 +170,7 @@ export function normalizeShaderState(input = {}) {
       twist: 6,
       spring: raw.touch?.spring === true,
     },
-    modulations: params.map((p, i) => {
-      const m = raw.modulations?.[i] || {};
-      return {
-        source: ["none", "lfo", "low", "mid", "high", "beat", "bpm"].includes(
-          m.source,
-        )
-          ? m.source
-          : "none",
-        amount: Number.isFinite(m.amount) ? clamp(m.amount) : 0.3,
-        rate: Number.isFinite(m.rate) ? clamp(m.rate) : 0.5,
-      };
-    }),
+    modulations: normalizeModulations(raw.modulations, params.length),
   };
   for (const k of ["x", "y", "x2", "y2", "pinch", "twist"])
     if (
@@ -217,4 +206,19 @@ export function modulatedValues(
     out[i] = clamp(s.values[i] + drive * (m?.amount || 0));
   }
   return out;
+}
+
+export function normalizeModulations(raw, count) {
+  return Array.from({ length: count }, (_, i) => {
+    const m = raw?.[i] || {};
+    return {
+      source: ["none", "lfo", "low", "mid", "high", "beat", "bpm"].includes(
+        m.source,
+      )
+        ? m.source
+        : "none",
+      amount: Number.isFinite(m.amount) ? clamp(m.amount) : 0.3,
+      rate: Number.isFinite(m.rate) ? clamp(m.rate) : 0.5,
+    };
+  });
 }

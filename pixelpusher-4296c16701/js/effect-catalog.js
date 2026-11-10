@@ -14,6 +14,7 @@ export const CATEGORIES = [
 const categories = {
   smear: "Datamosh",
   rgb: "Color",
+  hue: "Color",
   crush: "Color",
   neon: "Color",
   wave: "Distort",

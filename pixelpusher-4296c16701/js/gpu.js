@@ -15,7 +15,7 @@ export class Renderer{
   const vs=compile(gl.VERTEX_SHADER,vertex);this.programs=new Map();
   // Compile constant modes before playback. Dead branches and unused samplers disappear
   // on mobile drivers; no shader compile is triggered by enabling a layer mid-take.
-  for(let mode=0;mode<=17;mode++){
+  for(let mode=0;mode<=18;mode++){
    const fs=compile(gl.FRAGMENT_SHADER,prefix+body.replace('uniform int uMode;',`const int uMode=${mode};`)),program=gl.createProgram();
    gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,'aPosition');gl.linkProgram(program);gl.deleteShader(fs);
    if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error('GPU link: '+gl.getProgramInfoLog(program));

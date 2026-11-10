@@ -41,9 +41,10 @@ export class PictureController{
 }
 // XY pad is also keyboard-operable; its visible axes use the same mapping as finger 1.
 export function bindXY(pad,effect,onChange){
- const update=(x,y)=>{setMappedValue(effect,effect.touch.x,x);setMappedValue(effect,effect.touch.y,y);pad.textContent=`X ${Math.round(clamp(x)*100)} / Y ${Math.round(clamp(y)*100)}`;pad.setAttribute('aria-valuetext',pad.textContent);onChange();};let base=null;
+ const draw=(x,y)=>{pad.style.setProperty('--pad-x',(clamp(x)*100)+'%');pad.style.setProperty('--pad-y',((1-clamp(y))*100)+'%');};draw(mappedValue(effect,effect.touch.x),mappedValue(effect,effect.touch.y));
+ const update=(x,y)=>{draw(x,y);setMappedValue(effect,effect.touch.x,x);setMappedValue(effect,effect.touch.y,y);pad.textContent=`X ${Math.round(clamp(x)*100)} / Y ${Math.round(clamp(y)*100)}`;pad.setAttribute('aria-valuetext',pad.textContent);onChange();};let base=null;
  pad.addEventListener('pointerdown',e=>{e.preventDefault();base={values:[...effect.values],intensity:effect.intensity};pad.setPointerCapture(e.pointerId);const r=pad.getBoundingClientRect();update((e.clientX-r.left)/r.width,1-(e.clientY-r.top)/r.height);});
  pad.addEventListener('pointermove',e=>{if(!pad.hasPointerCapture(e.pointerId))return;e.preventDefault();const r=pad.getBoundingClientRect();update((e.clientX-r.left)/r.width,1-(e.clientY-r.top)/r.height);});
- const release=()=>{if(base&&effect.touch.spring){effect.values=base.values;effect.intensity=base.intensity;onChange();}base=null;};pad.addEventListener('pointerup',release);pad.addEventListener('pointercancel',release);pad.addEventListener('lostpointercapture',release);
+ const release=()=>{if(base&&effect.touch.spring){effect.values=base.values;effect.intensity=base.intensity;draw(mappedValue(effect,effect.touch.x),mappedValue(effect,effect.touch.y));onChange();}base=null;};pad.addEventListener('pointerup',release);pad.addEventListener('pointercancel',release);pad.addEventListener('lostpointercapture',release);
  pad.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();update(mappedValue(effect,effect.touch.x)+(e.key==='ArrowLeft'?-.025:e.key==='ArrowRight'?.025:0),mappedValue(effect,effect.touch.y)+(e.key==='ArrowDown'?-.025:e.key==='ArrowUp'?.025:0));});
 }

@@ -1,3 +1,5 @@
+import { valueGauge } from './ui-material.js';
+import { formatParam } from "./effects.js";
 import {
   CATALOG,
   CATALOG_BY_ID,
@@ -152,16 +154,19 @@ export class PerformanceConsole {
       b.addEventListener("keydown", (e) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
         e.preventDefault();
-        const i = CATEGORIES.indexOf(name),
+        const names = CATEGORIES.filter(
+          (n) => !this.isSimple() || n !== "Groups",
+        );
+        const i = names.indexOf(name),
           j =
             e.key === "Home"
               ? 0
               : e.key === "End"
-                ? CATEGORIES.length - 1
-                : (i + (e.key === "ArrowRight" ? 1 : -1) + CATEGORIES.length) %
-                  CATEGORIES.length;
-        this.setCategory(CATEGORIES[j]);
-        this.tabs.children[j].focus();
+                ? names.length - 1
+                : (i + (e.key === "ArrowRight" ? 1 : -1) + names.length) %
+                  names.length;
+        this.setCategory(names[j]);
+        this.tabs.querySelector('[data-category="' + names[j] + '"]').focus();
       });
       this.tabs.append(b);
     }
@@ -284,6 +289,7 @@ export class PerformanceConsole {
     this.schedule();
   }
   setCategory(name) {
+    if (this.isSimple() && name === "Groups") name = "All";
     this.cancelGesture();
     this.category = name;
     for (const b of this.tabs.children) {
@@ -383,6 +389,9 @@ export class PerformanceConsole {
     if (g.snapshot) this.restore(g.snapshot);
     g.suppress?.();
   }
+  isSimple() {
+    return document.body.classList.contains("simple-mode");
+  }
   bindTile(b, id) {
     let suppressed = 0;
     const finish = (e) => {
@@ -412,7 +421,7 @@ export class PerformanceConsole {
       g.timer = setTimeout(
         () => {
           if (this.gesture !== g) return;
-          if (this.state.holdMode && !this.selecting) {
+          if (this.state.holdMode && !this.selecting && !this.isSimple()) {
             g.snapshot = this.snapshot(id);
             g.held = true;
             this.toggle(id, true);
@@ -421,7 +430,7 @@ export class PerformanceConsole {
             this.openInspector(id);
           }
         },
-        this.state.holdMode && !this.selecting ? 90 : 450,
+        this.state.holdMode && !this.selecting && !this.isSimple() ? 90 : 450,
       );
     });
     b.addEventListener("pointermove", (e) => {
@@ -446,11 +455,15 @@ export class PerformanceConsole {
     b.addEventListener("click", (e) => {
       if (e.detail && performance.now() < suppressed) return;
       if (this.selecting) this.selectMember(id);
-      else if (!this.state.holdMode) this.toggle(id);
+      else if (this.isSimple()) {
+        this.toggle(id, true);
+        this.openInspector(id);
+      } else if (!this.state.holdMode) this.toggle(id);
     });
     b.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (!this.state.holdMode && !this.selecting) this.openInspector(id);
+      if (!this.state.holdMode && !this.selecting && !this.isSimple())
+        this.openInspector(id);
     });
     b.addEventListener("keydown", (e) => {
       if (e.shiftKey && e.key === "Enter") {
@@ -472,6 +485,7 @@ export class PerformanceConsole {
       }
       if (
         this.state.holdMode &&
+        !this.isSimple() &&
         !this.selecting &&
         (e.code === "Space" || e.code === "Enter")
       ) {
@@ -544,6 +558,7 @@ export class PerformanceConsole {
   sync(force = false, now = performance.now()) {
     if (!force && now - this.lastSync < 100) return;
     this.lastSync = now;
+    if(this.headerGauge && this.inspectorId){const ref=this.reference(this.inspectorId);if(ref)this.headerGauge.update(this.groups.includes(ref)?ref.values[0]:ref.intensity);}
     const model = this.getModel(),
       rawTarget = this.getTarget(),
       targetId =
@@ -591,7 +606,8 @@ export class PerformanceConsole {
       );
       t.trigger.setAttribute(
         "aria-label",
-        (this.selecting ? "Select " : "Toggle ") + d.name,
+        (this.selecting ? "Select " : this.isSimple() ? "Edit " : "Toggle ") +
+          d.name,
       );
       t.trigger.disabled = !!(this.selecting && g);
       t.tune.setAttribute("aria-label", "Tune " + d.name);
@@ -613,8 +629,8 @@ export class PerformanceConsole {
     for (const f of this.syncFields) {
       if (document.activeElement !== f.input) {
         const value = f.get();
-        f.input.value = value;
-        f.out.textContent = Math.round(value * 100) + "%";
+        f.input.value = value * f.scale;
+        f.out.textContent = f.format(value);
       }
     }
     if (
@@ -648,8 +664,8 @@ export class PerformanceConsole {
     if (!d) return;
     if (this.selection.has(id)) this.selection.delete(id);
     else {
-      if (this.selection.size >= 18) {
-        this.note("A group can have up to 18 members.", true);
+      if (this.selection.size >= 19) {
+        this.note("A group can have up to 19 members.", true);
         return;
       }
       if (d.kind === "shader")
@@ -660,6 +676,7 @@ export class PerformanceConsole {
     this.sync(true);
   }
   panelStart(title, kicker = "PARAMETERS") {
+    this.headerGauge?.node.remove();this.headerGauge=null;
     this.syncFields = [];
     this.panel.hidden = false;
     $("performance-panel-title").textContent = title;
@@ -727,27 +744,29 @@ export class PerformanceConsole {
       this.groups.find((g) => g.id === id) || targetState(this.getModel(), id)
     );
   }
-  slider(body, label, id, get, set) {
+  slider(body, label, id, get, set, meta = null) {
+    const scale = meta?.max || 1,
+      format = (v) => (meta ? formatParam(meta, v) : Math.round(v * 100) + "%");
     const wrap = el("label", "console-param"),
       caption = el("span", "console-param-caption", label),
-      out = el("output", null, Math.round(get() * 100) + "%"),
+      out = el("output", null, format(get())),
       input = el("input");
     input.type = "range";
     input.min = 0;
-    input.max = 1;
-    input.step = 0.01;
-    input.value = get();
+    input.max = scale;
+    input.step = scale === 360 ? 1 : 0.01;
+    input.value = get() * scale;
     input.id = id;
     input.setAttribute("aria-label", label);
     caption.append(out);
     input.addEventListener("input", () => {
-      set(Number(input.value));
-      out.textContent = Math.round(Number(input.value) * 100) + "%";
+      set(Number(input.value) / scale);
+      out.textContent = format(Number(input.value) / scale);
       this.changed();
     });
     wrap.append(caption, input);
     body.append(wrap);
-    this.syncFields.push({ input, out, get });
+    this.syncFields.push({ input, out, get, scale, format });
     return input;
   }
   openInspector(id, target = true) {
@@ -772,6 +791,9 @@ export class PerformanceConsole {
         g ? "PERFORMANCE GROUP" : d.category.toUpperCase(),
       ),
       params = effect.params || d.params;
+    this.headerGauge=valueGauge(g?'Macro':'Intensity');
+    this.headerGauge.update(g?g.values[0]:effect.intensity);
+    this.panel.querySelector('header').insertBefore(this.headerGauge.node,$('close-performance-panel'));
     if (target) {
       this.cancelPicture();
       this.onTarget(g ? g.id : d.kind === "shader" ? "shader" : id);
@@ -858,6 +880,7 @@ export class PerformanceConsole {
         "console-param-" + i,
         () => effect.values[i],
         (v) => (effect.values[i] = v),
+        d?.kind === "fx" ? p : null,
       );
     });
     if (effect.id === "smear" || effect.id === "trails") {
@@ -928,53 +951,58 @@ export class PerformanceConsole {
     );
     mappings.append(springLabel);
     body.append(mappings);
-    if (g) {
-      const mods = el("details", "console-details");
-      mods.id = "group-modulations";
-      mods.append(el("summary", null, "Macro / XY modulation"));
-      g.params.forEach((p, i) => {
-        const mod = g.modulations[i],
+    if (g || effect.id === "hue") {
+      const prefix = g ? "group" : "hue",
+        mods = el("details", "console-details");
+      mods.id = prefix + "-modulations";
+      mods.append(
+        el(
+          "summary",
+          null,
+          g ? "Macro / XY modulation" : "Hue · LFO / audio / BPM",
+        ),
+      );
+      params.forEach((p, i) => {
+        const mod = effect.modulations[i],
           section = el("div", "group-modulation");
-        section.append(
-          field(
-            p.name + " source",
-            select(
-              SOURCES,
-              mod.source,
-              (v) => {
-                mod.source = v;
-                this.changed();
-              },
-              p.name + " source",
-            ),
-          ),
+        const source = select(
+          SOURCES,
+          mod.source,
+          (v) => {
+            mod.source = v;
+            this.changed();
+          },
+          p.name + " source",
         );
-        section.querySelector("select").id = "group-mod-" + i;
+        source.id = prefix + "-mod-" + i;
+        section.append(field(p.name + " source", source));
         this.slider(
           section,
           "Amount",
-          "group-mod-amount-" + i,
+          prefix + "-mod-amount-" + i,
           () => mod.amount,
           (v) => (mod.amount = v),
         );
         this.slider(
           section,
-          "LFO rate",
-          "group-mod-rate-" + i,
+          "LFO / BPM rate",
+          prefix + "-mod-rate-" + i,
           () => mod.rate,
           (v) => (mod.rate = v),
         );
         mods.append(section);
       });
       body.append(mods);
-      this.routesUI(body, g);
-      body.append(
-        el(
-          "p",
-          "console-help",
-          "Group mappings are render-only; member sliders keep their base values. Shared routes follow group order. One shader scene at a time.",
-        ),
-      );
+      if (g) {
+        this.routesUI(body, g);
+        body.append(
+          el(
+            "p",
+            "console-help",
+            "Group mappings are render-only; member sliders keep their base values. Shared routes follow group order. One shader scene at a time.",
+          ),
+        );
+      }
     } else if (d.kind === "shader") {
       body.append(
         button(

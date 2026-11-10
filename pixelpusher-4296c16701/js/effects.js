@@ -139,3 +139,23 @@ export const EFFECTS = [
     ],
   },
 ];
+
+EFFECTS.push({
+  id: "hue",
+  name: "Hue rotate",
+  tag: "COLOR PHASE",
+  mode: 18,
+  params: [
+    { name: "Angle", value: 1 / 3, max: 360, unit: "°" },
+    { name: "Speed", value: 0, max: 1, unit: "Hz" },
+    p("Mix", 1),
+  ],
+});
+
+export function formatParam(param, value) {
+  return param?.unit === "°"
+    ? Math.round(value * 360) + "°"
+    : param?.unit === "Hz"
+      ? value.toFixed(2) + " Hz"
+      : Math.round(value * 100) + "%";
+}

@@ -22,7 +22,7 @@ export function normalizeMembers(raw) {
   let shader = false;
   for (const id of Array.isArray(raw) ? raw.slice(0, 64) : []) {
     const def = CATALOG_BY_ID.get(id);
-    if (!def || members.includes(id) || members.length >= 18) continue;
+    if (!def || members.includes(id) || members.length >= 19) continue;
     if (def.kind === "shader") {
       if (shader) continue;
       shader = true;
@@ -379,6 +379,7 @@ export class ConsoleEngine {
       const src = model.stack[i],
         out = result.stack[i],
         gain = this.gain("effects", src.id, src.enabled, p);
+      if (out.id === "hue") modulatedValues(out, time, bands, out.values);
       out.enabled = gain > 0;
       out.intensity *= gain;
     }

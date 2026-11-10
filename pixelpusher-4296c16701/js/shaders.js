@@ -139,6 +139,18 @@ void main(){
  }else if(uMode==17){
    float division=1.+floor(d*3.);float gate=step(fract(uPhase*division),.05+b*.5)*step(.12,uBeat);
    vec3 held=memoryAt(uv,3.);c=a<.5?mix(c,held,gate):c*(1.-gate);
+ }else if(uMode==18){
+   // Original piecewise hue wheel. Keep each pixel's saturation/value unchanged.
+   float high=max(c.r,max(c.g,c.b)),low=min(c.r,min(c.g,c.b)),span=high-low,hue=0.;
+   if(span>.00001){if(c.r>=c.g&&c.r>=c.b)hue=(c.g-c.b)/span;else if(c.g>=c.b)hue=2.+(c.b-c.r)/span;else hue=4.+(c.r-c.g)/span;}
+   float phase=fract(hue/6.+a+t*b)*6.,f=fract(phase);vec3 rotated;
+   if(phase<1.)rotated=vec3(span,span*f,0.);
+   else if(phase<2.)rotated=vec3(span*(1.-f),span,0.);
+   else if(phase<3.)rotated=vec3(0.,span,span*f);
+   else if(phase<4.)rotated=vec3(0.,span*(1.-f),span);
+   else if(phase<5.)rotated=vec3(span*f,0.,span);
+   else rotated=vec3(span,0.,span*(1.-f));
+   c=mix(original,rotated+vec3(low),d);
  }
  COLOR=vec4(clamp(mix(original,c,uMode==0?1.:uIntensity),0.,1.),1.);
 }`;

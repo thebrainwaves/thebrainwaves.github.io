@@ -38,7 +38,29 @@ export function thumbnail(id) {
     points.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b)));
     x.stroke();
   };
-  if (id === "rgb") {
+  if (id === "hue") {
+    for (let ring = 0; ring < 3; ring++)
+      for (let arc = 0; arc < 4; arc++) {
+        x.strokeStyle = colors[arc % colors.length];
+        x.lineWidth = 2;
+        x.beginPath();
+        x.arc(
+          56,
+          32,
+          10 + ring * 8,
+          (arc * Math.PI) / 2 + 0.07,
+          ((arc + 1) * Math.PI) / 2 - 0.08,
+        );
+        x.stroke();
+      }
+    line(
+      [
+        [56, 32],
+        [78, 14],
+      ],
+      "#a2b3da",
+    );
+  } else if (id === "rgb") {
     for (let k = 0; k < 3; k++) {
       x.strokeStyle = colors[k];
       x.strokeRect(28 + k * 5, 12 + k * 2, 42, 38);
