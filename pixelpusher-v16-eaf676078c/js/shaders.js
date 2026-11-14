@@ -182,5 +182,8 @@ void main(){
    c=mix(stale,c,fresh);
  }
  if(uMode==0&&uInkMix>0.){vec4 ink=TEX(uInk,safe(uv));c=mix(c,ink.rgb,ink.a*uInkMix);}
- COLOR=vec4(clamp(mix(original,c,uMode==0?1.:uIntensity),0.,1.),1.);
+ float k=uMode==0?1.:uIntensity;
+ // FX Brush: effect passes may be masked by finger-painted alpha (same unit as ink).
+ if(uMode!=0&&uInkMix>0.)k*=TEX(uInk,safe(vUV)).a*uInkMix;
+ COLOR=vec4(clamp(mix(original,c,k),0.,1.),1.);
 }`;

@@ -56,12 +56,13 @@
 <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
 <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4" class="fill"/></symbol>
+<symbol id="i-finger" viewBox="0 0 24 24"><path d="M9 11V5a1.6 1.6 0 0 1 3.2 0v5"/><path d="M12.2 10V8.6a1.6 1.6 0 0 1 3.2 0V11"/><path d="M15.4 10.4a1.6 1.6 0 0 1 3.2 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-4.8-2.4L4 15.4a1.6 1.6 0 0 1 2.5-2L9 15"/><path d="M3 5.5a6 6 0 0 1 3-3" opacity=".6"/></symbol>
+<symbol id="i-fxbrush" viewBox="0 0 24 24"><path d="M14 4l6 6-8.5 8.5-6-6z"/><path d="M5.5 12.5 3 21l8.5-2.5"/><path d="M17 2.5l.5 1.5M21.5 7l-1.5-.5M20 3.5l-1 1" /></symbol>
 <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 4 9 5-9 5-9-5z"/><path d="m3 14 9 5 9-5"/></symbol>
 </svg>
 <div id="app" class="app" data-tab="effects">
  <header class="topbar panel">
-  <button id="btn-source" class="tb-btn" type="button" aria-label="Choose source"><svg><use href="#i-source"/></svg><span>Source</span></button>
-  <div class="brand" aria-label="Pixel Pusher version 1.6"><b>PIXEL&nbsp;PUSHER</b><small id="version">1.6</small></div>
+  <h1 class="brand" aria-label="Pixel Pusher version 1.6.1"><span class="wordmark">PIXEL&nbsp;PUSHER</span><small><span class="maker">BRAINHERTZ</span><span id="version">1.6.1</span></small></h1>
   <div class="tb-group">
    <button id="btn-undo" class="tb-btn icon" type="button" aria-label="Undo" disabled><svg><use href="#i-undo"/></svg></button>
    <button id="btn-redo" class="tb-btn icon" type="button" aria-label="Redo" disabled><svg><use href="#i-redo"/></svg></button>
@@ -70,12 +71,16 @@
  </header>
  <main id="stage" class="stage panel">
   <div id="frame" class="canvas-frame"><canvas id="output" aria-label="Live preview. Hold to compare with the original, drag to adjust the selected effect."></canvas></div>
+  <div id="touch-overlay" class="touch-overlay" aria-hidden="true"></div>
+  <div id="mode-pill" class="mode-pill" hidden></div>
   <div id="hud" class="hud" hidden></div>
   <button id="rec-badge" class="rec-badge" type="button" hidden aria-label="Stop recording">REC 0:00</button>
  </main>
  <section id="drawer" class="drawer panel" hidden aria-live="polite"></section>
  <nav class="tabs panel" role="tablist" aria-label="Studio sections">
+  <button role="tab" class="tab" data-tab="source" aria-selected="false" type="button"><svg><use href="#i-source"/></svg><span>Source</span></button>
   <button role="tab" class="tab" data-tab="effects" aria-selected="true" type="button"><svg><use href="#i-sliders"/></svg><span>Effects</span></button>
+  <button role="tab" class="tab" data-tab="perform" aria-selected="false" type="button"><svg><use href="#i-finger"/></svg><span>Perform</span></button>
   <button role="tab" class="tab" data-tab="draw" aria-selected="false" type="button"><svg><use href="#i-pen"/></svg><span>Draw</span></button>
   <button role="tab" class="tab" data-tab="frames" aria-selected="false" type="button"><svg><use href="#i-film"/></svg><span>Frames</span></button>
   <button role="tab" class="tab" data-tab="looks" aria-selected="false" type="button"><svg><use href="#i-layers"/></svg><span>Looks</span></button>
@@ -86,7 +91,7 @@
 <div id="sheet" class="sheet-backdrop" hidden><section class="sheet panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><header class="sheet-head"><h2 id="sheet-title">Sheet</h2><button id="sheet-close" class="tb-btn icon" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button></header><div id="sheet-body" class="sheet-body"></div></section></div>
 <div id="toast" class="toast" role="status" hidden></div>
 <video id="media" playsinline muted loop hidden></video>
-<input id="file" type="file" accept="image/*,video/*" hidden>
+<input id="file" type="file" accept="image/*,video/*" hidden aria-label="Choose a photo or video">
 <noscript><p class="noscript">Pixel Pusher needs JavaScript and WebGL.</p></noscript>
 </body>
 </html>

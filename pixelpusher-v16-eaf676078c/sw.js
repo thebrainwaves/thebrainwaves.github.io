@@ -1,7 +1,7 @@
 // Versioned app-shell cache only. Never caches user media or remote requests.
-const CACHE='pixelpusher-v1.6.0';
+const CACHE='pixelpusher-v1.6.1';
 // Remove only old app-shell caches, including the pre-rename namespace. No media was cached.
-const ASSETS=['./','./index.html','./studio.css','./manifest.webmanifest','./js/v16/studio.js','./js/v16/history.js','./js/v16/modulation.js','./js/v16/frames-store.js','./js/v16/zip.js','./js/v16/share.js','./js/v16/fx-presets.js','./js/core.js','./js/effects.js','./js/console-state.js','./js/effect-catalog.js','./js/shader-state.js','./js/gpu.js','./js/shaders.js','./js/audio.js','./js/recorder.js','./js/photo-source.js','./js/drawing-state.js','./js/drawing-layer.js','./js/storage.js','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
+const ASSETS=['./','./index.html','./studio.css','./manifest.webmanifest','./js/v16/studio.js','./js/v16/history.js','./js/v16/modulation.js','./js/v16/frames-store.js','./js/v16/zip.js','./js/v16/share.js','./js/v16/fx-presets.js','./js/v16/fx-paint.js','./js/v16/perform.js','./js/touch.js','./js/core.js','./js/effects.js','./js/console-state.js','./js/effect-catalog.js','./js/shader-state.js','./js/gpu.js','./js/shaders.js','./js/audio.js','./js/recorder.js','./js/photo-source.js','./js/drawing-state.js','./js/drawing-layer.js','./js/storage.js','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>(k.startsWith('pixelpusher-')||k.startsWith('brainhertz-glitch-'))&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',event=>{
