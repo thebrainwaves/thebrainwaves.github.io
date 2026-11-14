@@ -73,7 +73,7 @@
 </svg>
 <div id="app" class="app" data-tab="effects">
  <header class="topbar panel">
-  <h1 class="brand" aria-label="Pixel Pusher version 1.7.2"><span class="wordmark"><span class="wm-a">PIXEL</span>&nbsp;<span class="wm-b">PUSHER</span></span><small><span class="maker">BRAINHERTZ</span><span id="version">1.7.2</span></small></h1>
+  <h1 class="brand" aria-label="Pixel Pusher version 1.7.3"><span class="wordmark"><span class="wm-a">PIXEL</span>&nbsp;<span class="wm-b">PUSHER</span></span><small><span class="maker">BRAINHERTZ</span><span id="version">1.7.3</span></small></h1>
   <div class="tb-group">
    <button id="btn-undo" class="tb-btn icon" type="button" aria-label="Undo" disabled><svg><use href="#i-undo"/></svg></button>
    <button id="btn-redo" class="tb-btn icon" type="button" aria-label="Redo" disabled><svg><use href="#i-redo"/></svg></button>
@@ -130,7 +130,8 @@
 <div id="map-out" class="map-out" hidden aria-label="Clean projector output">
  <div id="map-touch" class="touch-overlay" aria-hidden="true"></div>
  <div id="map-hint" class="map-hint" hidden></div>
- <div id="map-out-bar" class="map-out-bar" hidden role="toolbar" aria-label="Output controls">
+ <div id="mo-corner" class="mo-corner mo-ui"><button id="mo-x" class="tb-btn mo-x" type="button" aria-label="Exit output"><svg><use href="#i-close"/></svg><span>Exit</span></button><button id="mo-more" class="tb-btn mo-more" type="button" aria-label="Output controls"><svg><use href="#i-grid"/></svg></button></div>
+ <div id="map-out-bar" class="map-out-bar mo-ui" hidden role="toolbar" aria-label="Output controls">
   <button id="mo-exit" class="tb-btn accent" type="button"><svg><use href="#i-close"/></svg><span>Exit output</span></button>
   <button id="mo-test" class="tb-btn" type="button" aria-pressed="false"><svg><use href="#i-grid"/></svg><span>Test pattern</span></button>
   <button id="mo-black" class="tb-btn" type="button" aria-pressed="false"><svg><use href="#i-power"/></svg><span>Blackout</span></button>

@@ -84,7 +84,7 @@ export class ExitGesture{
  // x,y normalized 0..1 in the output; returns 'triple' | null on up, and arms a long-press checked by poll().
  start(x,y,t,id=0,count=1){if(count>1){this.down=null;return null;}this.down={x,y,t,id,moved:false};return null;}
  move(x,y,id=0){const d=this.down;if(d&&d.id===id&&Math.hypot(x-d.x,y-d.y)>this.slop/400)d.moved=true;}
- end(x,y,t,id=0){const d=this.down;this.down=null;if(!d||d.id!==id||d.moved||t-d.t>this.tapMs)return null;this.taps=this.taps.filter(p=>t-p.t<this.tripleMs&&Math.hypot(p.x-x,p.y-y)<.15);this.taps.push({x,y,t});if(this.taps.length>=3){this.taps=[];return 'triple';}return null;}
+ end(x,y,t,id=0){const d=this.down;this.down=null;this.lastTap=false;if(!d||d.id!==id||d.moved||t-d.t>this.tapMs)return null;this.lastTap=true;this.taps=this.taps.filter(p=>t-p.t<this.tripleMs&&Math.hypot(p.x-x,p.y-y)<.15);this.taps.push({x,y,t});if(this.taps.length>=3){this.taps=[];return 'triple';}return null;}
  cancel(){this.down=null;}
  poll(t,performing=false){const d=this.down;if(!d||d.moved||t-d.t<this.longMs)return null;if(performing&&!(d.x<this.corner&&d.y<this.corner))return null;this.down=null;return 'long';}
 }

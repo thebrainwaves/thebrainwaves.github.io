@@ -275,3 +275,9 @@ body.map-output{overflow:hidden;background:#000}body.map-output .app{visibility:
 /* ---------- 1.7.2 robustness ---------- */
 .kt-dia.past{opacity:.45;outline:1px dashed #ff2b3d;}
 .hint.warn{color:#ffb14a;}
+/* ---------- 1.7.3 always-reachable exit ---------- */
+.mo-corner{position:absolute;left:calc(var(--safe-l,0px) + 12px);top:calc(var(--safe-t) + 12px);z-index:5;display:flex;gap:8px;opacity:0;pointer-events:none;transition:opacity .35s}
+.mo-corner.on{opacity:.82;pointer-events:auto}
+.mo-corner .tb-btn{min-height:48px;min-width:48px;background:rgba(6,8,18,.72);border:1px solid rgba(232,236,255,.35);color:#fff;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.mo-corner .mo-x{border-color:rgba(255,43,61,.8);box-shadow:0 0 18px rgba(255,43,61,.35)}
+.map-out-bar{z-index:5}.map-out .touch-overlay{pointer-events:none}

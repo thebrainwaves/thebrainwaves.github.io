@@ -9,7 +9,7 @@ const COLORS=['#ff2b3d','#2f6cff','#6e3bff','#27e889'];
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255);
 export function createMapUI(ctx){
  const {el,tile,chip,button,label,slider,head,note,store}=ctx,$=id=>document.getElementById(id);
- let venueName='',mapping=load(),sel=0,mode='corners',fine=false,handle=null,renderer=null,failed=false,output=false,wake=null,barTimer=0,saveTimer=0,mapGen=null,performer=null;
+ let wasFull=false,venueName='',mapping=load(),sel=0,mode='corners',fine=false,handle=null,renderer=null,failed=false,output=false,wake=null,barTimer=0,saveTimer=0,mapGen=null,performer=null;
  const clipVideos=new Map(),genTimes=new Map(),patterns=new Map(),gesture=new ExitGesture(),outPattern=document.createElement('canvas');
  const view=$('map-view'),canvas=$('map-canvas'),overlay=$('map-ui'),out=$('map-out');let box={x:0,y:0,w:1,h:1},dpr=1,lastFrame=0;
  function load(){try{return normalizeMapping(JSON.parse(store.getItem(MAP_KEY)||'null'));}catch{return defaultMapping();}}
@@ -43,7 +43,7 @@ export function createMapUI(ctx){
   prepareGens(dt,signals);const k=dpr,b={x:box.x*k,y:box.y*k,w:box.w*k,h:box.h*k};
   if(mapping.test){const pw=Math.round(Math.min(1280,b.w)),ph=Math.round(pw*b.h/b.w),key='pat'+pw+'x'+ph;if(outPattern._key!==key){drawOutputPattern(outPattern,pw,ph);renderer.forget(outPattern._key);outPattern._key=key;}}
   renderer.draw(mapping,source,b,{pattern:mapping.test?outPattern:null,patternFor});
-  if(output){const g=gesture.poll(performance.now(),mapping.perform);if(g==='long')exitOutput();}else drawOverlay();}
+  if(output){const g=gesture.poll(performance.now(),false);if(g==='long')exitOutput();}else drawOverlay();}
  // ---------- Editor overlay: outlines, big handles, mesh, mask ----------
  const toPx=([x,y])=>[box.x+x*box.w,box.y+y*box.h];
  const uvToOut=(s,u,v)=>{const H=squareToQuad(s.corners);if(!H)return [u,v];const [x,y]=applyH(H,u,v),o=s.mesh.n>=2?meshOffsetAt(s.mesh,u,v):[0,0];return [x+o[0],y+o[1]];};
@@ -87,22 +87,35 @@ export function createMapUI(ctx){
   else if(h?.type==='mask'){const q=s.mask.points[h.k];s.mask.points[h.k]=[q[0]+dx,q[1]+dy];}else moveSurface(s,dx,dy);changed();}
  // ---------- Clean output ----------
  async function lock(){try{wake=await navigator.wakeLock?.request('screen');}catch{wake=null;}}
- function enterOutput(){if(!ensure())return;output=true;handle=null;out.hidden=false;out.prepend(canvas);document.body.classList.add('map-output');showBar(false);
-  const hint=$('map-hint');hint.textContent=mapping.perform?'TRIPLE-TAP: CONTROLS · HOLD TOP-LEFT 1 S: EXIT · FINGERS PERFORM':'TRIPLE-TAP: CONTROLS · HOLD 1 S: EXIT';hint.hidden=false;clearTimeout(hint._t);hint._t=setTimeout(()=>{hint.hidden=true;},3500);
+ let resetPtrs=()=>{};
+ function enterOutput(){if(!ensure())return;output=true;resetPtrs();handle=null;out.hidden=false;out.prepend(canvas);document.body.classList.add('map-output');showBar(false);
+  ctx.pushLayer?.('map-output',exitOutput);showCorner(true);
+  const hint=$('map-hint');hint.textContent='TAP: SHOW EXIT · BACK, 2-FINGER TAP OR HOLD 1 S: EXIT · TRIPLE-TAP: CONTROLS';hint.hidden=false;clearTimeout(hint._t);hint._t=setTimeout(()=>{hint.hidden=true;},3500);
   try{const f=out.requestFullscreen||out.webkitRequestFullscreen;const r=f?.call(out);r?.catch?.(()=>{});}catch{}lock();}
- function exitOutput(){if(!output)return;output=false;gesture.cancel();performer?.cancel();showBar(false);$('map-hint').hidden=true;out.hidden=true;view.prepend(canvas);document.body.classList.remove('map-output');
+ // Mesh / Mask edit modes are a back-navigation layer: Back (swipe, button, Escape) returns to Corners.
+ function setMode(k){mode=k;if(k==='corners')ctx.dropLayer?.('map-mode');else ctx.pushLayer?.('map-mode',()=>{mode='corners';handle=null;ctx.renderDrawer();});}
+ function exitOutput(){if(!output)return;output=false;resetPtrs();ctx.dropLayer?.('map-output');gesture.cancel();performer?.cancel();showBar(false);showCorner(false);$('map-hint').hidden=true;out.hidden=true;view.prepend(canvas);document.body.classList.remove('map-output');
   try{if(document.fullscreenElement||document.webkitFullscreenElement){const r=(document.exitFullscreen||document.webkitExitFullscreen).call(document);r?.catch?.(()=>{});}}catch{}const w=wake;wake=null;w?.release?.()?.catch?.(()=>{});ctx.renderStrip();}
+ // Corner Exit (1.7.3): always reachable. Shown on entry and on ANY single tap, fades after 3 s (and is not tappable while faded).
+ let cornerTimer=0;function showCorner(on){const c=$('mo-corner');if(!c)return;clearTimeout(cornerTimer);c.classList.toggle('on',!!on);if(on)cornerTimer=setTimeout(()=>c.classList.remove('on'),3000);}
  function showBar(on){const b=$('map-out-bar');b.hidden=!on;clearTimeout(barTimer);if(on){syncBar();barTimer=setTimeout(()=>showBar(false),6000);}}
  function syncBar(){$('mo-test').setAttribute('aria-pressed',String(mapping.test));$('mo-black').setAttribute('aria-pressed',String(mapping.blackout));$('mo-perform').setAttribute('aria-pressed',String(mapping.perform));}
  function bindOutput(){const rel=e=>{const r=out.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];};const ids=new Set();let barGuard=0;
-  $('map-out-bar').addEventListener('click',e=>{if(performance.now()<barGuard){e.stopPropagation();e.preventDefault();}},true);
-  out.addEventListener('pointerdown',e=>{if(e.target.closest('#map-out-bar'))return;ids.add(e.pointerId);const [x,y]=rel(e);gesture.start(x,y,performance.now(),e.pointerId,ids.size);});
-  out.addEventListener('pointermove',e=>{const [x,y]=rel(e);gesture.move(x,y,e.pointerId);});
-  const end=e=>{if(!ids.has(e.pointerId))return;ids.delete(e.pointerId);const [x,y]=rel(e);if(gesture.end(x,y,performance.now(),e.pointerId)==='triple'){barGuard=performance.now()+400;showBar($('map-out-bar').hidden);}};
-  out.addEventListener('pointerup',end);out.addEventListener('pointercancel',e=>{ids.delete(e.pointerId);gesture.cancel();});
-  $('mo-exit').addEventListener('click',exitOutput);$('mo-test').addEventListener('click',()=>{mapping.test=!mapping.test;changed();syncBar();showBar(true);});
+  for(const id of ['map-out-bar','mo-corner'])$(id).addEventListener('click',e=>{if(performance.now()<barGuard){e.stopPropagation();e.preventDefault();}},true);
+  // Two-finger tap = exit: both fingers down close together, lifted quickly, no drag.
+  let two=null;resetPtrs=()=>{ids.clear();two=null;};
+  out.addEventListener('pointerdown',e=>{if(e.target.closest('.mo-ui'))return;ids.add(e.pointerId);const now=performance.now(),[x,y]=rel(e);gesture.start(x,y,now,e.pointerId,ids.size);
+   if(ids.size===1)two={t:now,n:1,moved:false,pts:{[e.pointerId]:[x,y]}};else if(two&&ids.size===2&&now-two.t<300){two.n=2;two.pts[e.pointerId]=[x,y];}else two=null;});
+  out.addEventListener('pointermove',e=>{const [x,y]=rel(e);gesture.move(x,y,e.pointerId);const p0=two?.pts[e.pointerId];if(p0&&Math.hypot(x-p0[0],y-p0[1])>.04)two.moved=true;});
+  const end=e=>{if(!ids.has(e.pointerId))return;ids.delete(e.pointerId);const now=performance.now(),[x,y]=rel(e);
+   if(two&&two.n===2&&!ids.size){const ok=!two.moved&&now-two.t<650;two=null;if(ok){exitOutput();return;}}
+   const g=gesture.end(x,y,now,e.pointerId);barGuard=now+400;if(g==='triple'){showBar($('map-out-bar').hidden);showCorner(true);}else if(gesture.lastTap&&!ids.size)showCorner(true);};
+  out.addEventListener('pointerup',end);out.addEventListener('pointercancel',e=>{ids.delete(e.pointerId);gesture.cancel();});out.addEventListener('lostpointercapture',e=>{if(!output)ids.delete(e.pointerId);});
+  $('mo-exit').addEventListener('click',exitOutput);$('mo-x').addEventListener('click',exitOutput);$('mo-more').addEventListener('click',()=>{showBar($('map-out-bar').hidden);showCorner(true);});
+  // System fullscreen exit (iPad swipe / Esc in fullscreen) leaves the output too.
+  for(const ev of ['fullscreenchange','webkitfullscreenchange'])document.addEventListener(ev,()=>{if(output&&wasFull&&!(document.fullscreenElement||document.webkitFullscreenElement))exitOutput();wasFull=!!(document.fullscreenElement||document.webkitFullscreenElement);});$('mo-test').addEventListener('click',()=>{mapping.test=!mapping.test;changed();syncBar();showBar(true);});
   $('mo-black').addEventListener('click',()=>{mapping.blackout=!mapping.blackout;changed();syncBar();showBar(true);});$('mo-perform').addEventListener('click',()=>{mapping.perform=!mapping.perform;changed();syncBar();showBar(true);});
-  document.addEventListener('keydown',e=>{if(output&&e.key==='Escape')exitOutput();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&output)lock();});}
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&output)lock();});}
  // ---------- Strip ----------
  function strip(s){
   s.append(tile({label:'Output',iconName:'projector',action:true,color:'red',aria:'Clean output: fullscreen projector view',onTap:enterOutput}));
@@ -117,12 +130,12 @@ export function createMapUI(ctx){
  // ---------- Drawers ----------
  function drawer(d,which){if(which==='venues')return drawerVenues(d);const s=cur();if(!s)return;
   head(d,s.name,'MAP · SURFACE '+(sel+1)+' OF '+mapping.surfaces.length);
-  const modes=el('div','row seg');for(const [k,t] of [['corners','Corners'],['mesh','Mesh warp'],['mask','Mask']])modes.append(chip(t,()=>{mode=k;handle=null;if(k==='mesh'&&!s.mesh.n){s.mesh=resizeMesh(s.mesh,4);changed();}ctx.renderDrawer();},mode===k));d.append(label('Edit'),modes);
+  const modes=el('div','row seg');for(const [k,t] of [['corners','Corners'],['mesh','Mesh warp'],['mask','Mask']])modes.append(chip(t,()=>{setMode(k);handle=null;if(k==='mesh'&&!s.mesh.n){s.mesh=resizeMesh(s.mesh,4);changed();}ctx.renderDrawer();},mode===k));d.append(label('Edit'),modes);
   const pad=el('div','nudge'),arrow=(t,a,dx,dy)=>{const b=button('',a,()=>nudge(dx,dy),'icon');b.setAttribute('aria-label','Nudge '+t);return b;};
   pad.append(arrow('left','left',-1,0),arrow('up','up',0,-1),arrow('down','down',0,1),arrow('right','right',1,0));const fb=chip(fine?'Fine ×¼ on':'Fine',()=>{fine=!fine;ctx.renderDrawer();},fine);fb.setAttribute('aria-label','Fine mode');pad.append(fb);
   d.append(label('Nudge',el('span','tc-inline',handle?.type==='corner'?'CORNER '+(handle.i+1):handle?.type==='mesh'?'POINT '+(handle.i+1)+','+(handle.j+1):handle?.type==='mask'?'MASK POINT '+(handle.k+1):'WHOLE SURFACE')),pad);
   if(mode==='corners'){const r=el('div','row');r.append(button('Reset corners','reset',()=>{resetCorners(s,sel);changed();}),button('Full frame','grid',()=>{s.corners=[[0,0],[1,0],[1,1],[0,1]];changed();}));d.append(r);}
-  if(mode==='mesh'){const r=el('div','row');for(const n of MESH_SIZES.slice(1))r.append(chip(n+'×'+n,()=>{s.mesh=resizeMesh(s.mesh,n);changed(true);},s.mesh.n===n));r.append(chip('Off',()=>{s.mesh=resizeMesh(s.mesh,0);mode='corners';changed(true);},!s.mesh.n));
+  if(mode==='mesh'){const r=el('div','row');for(const n of MESH_SIZES.slice(1))r.append(chip(n+'×'+n,()=>{s.mesh=resizeMesh(s.mesh,n);changed(true);},s.mesh.n===n));r.append(chip('Off',()=>{s.mesh=resizeMesh(s.mesh,0);setMode('corners');changed(true);},!s.mesh.n));
    d.append(label('Mesh points'),r,el('p','hint','Drag the points to bend the image onto curved surfaces. Corner pins still move the whole mesh.'));const rr=el('div','row');rr.append(button('Flatten mesh','reset',()=>{s.mesh=resizeMesh(null,s.mesh.n);changed();}));d.append(rr);}
   if(mode==='mask'){const m=s.mask,r=el('div','row');r.append(chip(m.on?'Mask on':'Mask off',()=>{if(m.points.length<3)return note('Tap 3 or more points first.',true);m.on=!m.on;changed(true);},m.on),chip('Invert',()=>{m.invert=!m.invert;changed(true);},m.invert));
    if(!m.closed&&m.points.length>=3)r.append(chip('Close shape',()=>{m.closed=true;m.on=true;changed(true);}));r.append(button('Clear mask','trash',()=>{s.mask={points:[],closed:false,on:false,invert:false,feather:m.feather};handle=null;changed(true);},'danger'));
@@ -144,7 +157,7 @@ export function createMapUI(ctx){
  function order(dir){const i=sel,j=i+dir;if(j<0||j>=mapping.surfaces.length)return;const a=mapping.surfaces;[a[i],a[j]]=[a[j],a[i]];sel=j;changed(true);ctx.renderStrip();note(dir>0?'Moved up (drawn later, on top)':'Moved down');}
  function venues(){try{const v=JSON.parse(store.getItem(VENUES_KEY)||'[]');return Array.isArray(v)?v.filter(x=>x&&typeof x.name==='string').slice(0,MAX_VENUES):[];}catch{return [];}}
  function writeVenues(v){try{store.setItem(VENUES_KEY,JSON.stringify(v.slice(0,MAX_VENUES)));return true;}catch{note('Storage is full. Delete a venue first.',true);return false;}}
- function useMapping(m,name){venueName=name;mapping=normalizeMapping(m);sel=0;handle=null;mode='corners';renderer?.drop(new Set(mapping.surfaces.map(s=>s.id)));pruneClips();changed();ctx.renderStrip();ctx.renderDrawer();
+ function useMapping(m,name){venueName=name;mapping=normalizeMapping(m);sel=0;handle=null;setMode('corners');renderer?.drop(new Set(mapping.surfaces.map(s=>s.id)));pruneClips();changed();ctx.renderStrip();ctx.renderDrawer();
   const missing=mapping.surfaces.filter(s=>s.source.kind==='clip'&&!ctx.clipList().some(c=>c.id===s.source.clipId)).length;note('Venue loaded: '+name+(missing?' · '+missing+' clip source'+(missing>1?'s':'')+' not on this device':''),!!missing);}
  function drawerVenues(d){head(d,'Venues','MAPPING SETUPS · ON THIS DEVICE');
   const asp=el('div','row');for(const [k] of ASPECTS)asp.append(chip(k==='screen'?'This screen':k,()=>{mapping.aspect=k;changed(true);},mapping.aspect===k));d.append(label('Output shape'),asp);
@@ -161,7 +174,7 @@ export function createMapUI(ctx){
  function bindImport(){$('venue-file').addEventListener('change',ctx.safe(async()=>{const f=$('venue-file').files?.[0];$('venue-file').value='';if(!f)return;if(f.size>2e6)throw new Error('That file is too large to be a venue.');const v=venueFromJSON(await f.text());useMapping(v.mapping,v.name);}));}
  bindEditor();bindOutput();bindImport();
  return {strip,drawer,frame,enterOutput,exitOutput,addSurface,
-  active:()=>ctx.tab()==='map'||output,enter(){ensure();ctx.openDrawer('map');},leave(){handle=null;},
+  active:()=>ctx.tab()==='map'||output,enter(){ensure();ctx.openDrawer('map');},leave(){handle=null;if(mode!=='corners')setMode('corners');},
   api:{get mapping(){return mapping;},set mapping(m){mapping=normalizeMapping(m);sel=0;changed();},get sel(){return sel;},set sel(i){sel=i;},get mode(){return mode;},set mode(m){mode=m;},get output(){return output;},get fine(){return fine;},
    get box(){return box;},get renderer(){return renderer;},get clipVideos(){return clipVideos;},nudge,addSurface,enterOutput,exitOutput,useMapping,venues,save:()=>{try{store.setItem(MAP_KEY,JSON.stringify(mapping));}catch{}}}};
 }
