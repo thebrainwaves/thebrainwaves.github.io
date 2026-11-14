@@ -109,9 +109,9 @@ varying vec2 vUV;
 uniform vec2 uRes;uniform float uTime,uScale,uCx,uA,uB,uBeat;uniform vec4 uAudio;uniform vec3 uC0,uC1,uC2,uDark;uniform float uNoPink,uStyle;uniform sampler2D uText,uText2;
 #define PI 3.14159265
 #define TAU 6.2831853
-float h11(float n){return fract(sin(n*127.1)*43758.5453);}
-float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-vec2 h22(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p)*43758.5453);}
+float h11(float n){n=mod(n,1024.);return fract(sin(n*127.1)*43758.5453);}
+float h21(vec2 p){p=mod(p,1024.);return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+vec2 h22(vec2 p){p=mod(p,1024.);p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p)*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x),mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)),f.x),f.y);}
 float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
 // No pink (Brainhertz rule): colour pairs whose straight blend would read pink/magenta (e.g. red->violet, blue->red)

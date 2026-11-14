@@ -20,7 +20,8 @@ uniform float uBeat;
 uniform float uPhase;
 uniform float uTime;
 uniform int uMode;
-float hash(vec2 v){return fract(sin(dot(v,vec2(41.13,289.7)))*43758.5453);}
+// Inputs wrap first so sin() always gets a small argument (phone GPUs lose precision on large ones and the hash went constant).
+float hash(vec2 v){v=mod(v,1024.);return fract(sin(dot(v,vec2(41.13,289.7)))*43758.5453);}
 vec2 safe(vec2 v){return clamp(v,vec2(.001),vec2(.999));}
 vec3 sampleAt(vec2 p){return TEX(uFrame,safe(p)).rgb;}
 float lum(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
@@ -183,7 +184,9 @@ void main(){
    float diff=abs(lum(sampleAt(center))-lum(TEX(uPrevious,safe(center)).rgb));
    vec2 dir=(vec2(hash(blk),hash(blk+3.1))-.5)*uExtra.x*.03*(.2+diff*6.);
    vec3 stale=TEX(uHistory,safe(uv-dir)).rgb;
-   float fresh=step(a*.97+.02,hash(blk+floor(t*8.)))*(1.-step(d*.3+.01,diff));
+   float fresh=step(a*.93+.02,hash(blk+floor(t*8.)))*(1.-step(d*.3+.01,diff));
+   // 1.7.2: a small guaranteed refresh so Hold 100% or constant motion can never freeze the picture for good.
+   fresh=max(fresh,step(.97,hash(blk*1.7+floor(t*3.)+11.)));
    c=mix(stale,c,fresh);
  }
  if(uMode==0&&uInkMix>0.){vec4 ink=TEX(uInk,safe(uv));c=mix(c,ink.rgb,ink.a*uInkMix);}

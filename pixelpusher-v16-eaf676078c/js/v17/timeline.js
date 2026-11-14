@@ -41,8 +41,11 @@ export const ease=u=>u*u*(3-2*u);
 export function keyValue(keys,p,t){let a=null,b=null;for(const k of keys){if(k.p!==p)continue;if(k.t<=t+1e-9)a=k;else{b=k;break;}}
  if(!a&&!b)return null;if(!a)return b.v;if(!b)return a.v;const u=(t-a.t)/Math.max(1e-6,b.t-a.t);return a.v+(b.v-a.v)*(a.e==='ease'?ease(u):u);}
 // Replaces the base value of keyed params in a modulated output, keeping the modulation offset.
-export function applyKeys(owner,out,t){const keys=owner.keys;if(!keys||!keys.length)return out;
+// 1.7.2: while a finger performs on an owner (owner._touch), the live values win over its keys; keys resume on release.
+export function applyKeys(owner,out,t){const keys=owner.keys;if(!keys||!keys.length||owner._touch)return out;
  for(const p of keyedParams(keys)){const kv=keyValue(keys,p,t);if(kv===null)continue;
   if(p===-1)out.intensity=clamp(out.intensity-owner.intensity+kv);else if(p<out.values.length)out.values[p]=clamp(out.values[p]-(owner.values[p]??0)+kv);}
  return out;}
+// Copies the keyed values at t into the owner's base values so a performance starts exactly where the keys are (no jump).
+export function adoptKeys(owner,t){const keys=owner?.keys;if(!keys||!keys.length)return owner;for(const p of keyedParams(keys)){const v=keyValue(keys,p,t);if(v===null)continue;if(p===-1)owner.intensity=v;else if(Array.isArray(owner.values)&&p<owner.values.length)owner.values[p]=v;}return owner;}
 export function nextKeyTime(owners,t,dir){let best=null;for(const o of owners)for(const k of o.keys||[]){if(dir>0?k.t>t+.5/FPS:k.t<t-.5/FPS){if(best===null||(dir>0?k.t<best:k.t>best))best=k.t;}}return best;}

@@ -1,4 +1,4 @@
-// Pixel Pusher 1.6.5 studio shell. Original Brainhertz Productions code; on-device only.
+// Pixel Pusher 1.7.2 studio shell. Original Brainhertz Productions code; on-device only.
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,randomizeStack,QualityController,BeatClock,normalizePreset} from '../core.js';
 import {formatParam} from '../effects.js';
 import {Renderer} from '../gpu.js';
@@ -17,12 +17,13 @@ import {FxPaint} from './fx-paint.js';
 import {FingerPerformer,TOUCH_KEYS} from './perform.js';
 import {bindXY} from '../touch.js';
 import {SOURCES as GEN_SOURCES,SOURCE_BY_ID as GEN_BY_ID,genParams,defaultGen,normalizeGen,cleanText,speedFactor,MAX_TEXT,MAX_TEXT_LINES,TEXT_FONTS,TEXT_ALIGNS,TEXT_STYLES,STYLE_LABELS,textSpec} from './gen-sources.js';
-import {FPS,DURATIONS,MAX_KEYS,EASES,defaultTimeline,clampRange,normalizeTimeline,stepTime,fmtTC,normalizeKeys,setKey,removeKey,keyAt,hasKeys,keyValue,applyKeys,moveKey,trackOf,keyedParams,nextKeyTime} from '../v17/timeline.js';
+import {FPS,DURATIONS,MAX_KEYS,EASES,defaultTimeline,clampRange,normalizeTimeline,stepTime,fmtTC,normalizeKeys,setKey,removeKey,keyAt,hasKeys,keyValue,applyKeys,adoptKeys,moveKey,trackOf,keyedParams,nextKeyTime} from '../v17/timeline.js';
 import {analyzeBlob,LiveOnsets,envAt,recordMarker} from '../v17/beats.js';
 import {ClipStore} from '../v17/clips-store.js';
 import {Generator} from './generator.js';
+import {createMapUI} from '../v17/map-ui.js';
 
-export const VERSION='1.7.0';
+export const VERSION='1.7.2';
 const $=id=>document.getElementById(id);
 const DEFS=new Map(EFFECTS.map(e=>[e.id,e]));
 const SESSION_KEY='brainhertz.pixelpusher.session.v16',LOOKS_KEY='brainhertz.pixelpusher.looks.v16';
@@ -44,7 +45,7 @@ let generator=null,gen=defaultGen('tunnel'),genOut={values:new Array(6).fill(0)}
 // Global LFOs (1.6.4): 4 shared LFOs any slider can be assigned to in one tap.
 let lfos=defaultLfos(),activeLfo=0;const lfoAcc=[],liveSliders=[],modTmp={values:new Array(8).fill(0)};
 const drawOwner={id:'draw',intensity:1,values:[1,0,0],mods:[]},fxbOwner={id:'fxbrush',intensity:1,values:[0,0],mods:[]};
-let touchAll=false,momentary=false,touchFreeze=false,performer=null;
+let touchAll=false,momentary=false,touchFreeze=false,performer=null,mapUI=null;
 const FEEDBACK=['smear','trails','slit','beat','mosh'];
 // 1.7 timeline, beat tracks, keyframes, review + clips
 let tl=defaultTimeline(),tlTouched=false,mediaBlob=null,clipSource=null,rendering=null,renderCache=null,clipList=[],selectedClip=null,prevT=0;
@@ -94,10 +95,36 @@ function ensureSize(){const t=targetSize();if(!t)return false;if(t[0]!==canvas.w
 const signals={level:0,low:0,mid:0,high:0,beat:0,beats:0,phase:0};
 let genEditShown=null;
 function syncGenEdit(){const show=sourceKind==='gen'&&gen.id==='text'&&!(drawerOpen&&drawerMode==='gen');if(show!==genEditShown){genEditShown=show;$('gen-edit').hidden=!show;}}
+// 1.7.2: the loop always reschedules first and a failing frame never stops it; repeated failures trigger recovery.
 function loop(now){
- syncGenEdit();
  requestAnimationFrame(loop);
+ try{syncGenEdit();frame(now);}catch(e){loopError(e);}
+}
+let dragKt=0,loopErrs=0,loopErrAt=0,blackRun=0,probeAt=0,glLostAt=0,errNoteAt=0;const perf={avg:0,n:0,max:0},drawSig={};
+function loopError(e){const now=performance.now();if(now-loopErrAt>3000)loopErrs=0;loopErrAt=now;loopErrs++;
+ if(loopErrs===1)console.warn('frame error',e);
+ if(loopErrs===1||loopErrs===30){friendly('The preview hit a problem and is recovering. Your work is saved.');}
+ if(loopErrs===30)renderer?.clearHistory?.();
+ if(loopErrs===90){rebuildRenderer('frame errors');loopErrs=0;}}
+function friendly(msg){const now=performance.now();if(now-errNoteAt<4000)return;errNoteAt=now;note(msg,true);}
+function grabKeys(list){for(const o of list||[])adoptKeys(o,tl.t);}
+function perfStat(ms){if(!Number.isFinite(ms))return;perf.n++;perf.avg+=(ms-perf.avg)/Math.min(perf.n,120);if(ms>perf.max)perf.max=ms;}
+// Rebuilds the main WebGL renderer (after a lost context or a stuck state). Keeps the canvas, stack, keys and source.
+function rebuildRenderer(reason){try{try{renderer?.destroy?.();}catch{}renderer=new Renderer(canvas);const t=targetSize();if(t)renderer.resize(t[0],t[1]);renderer.clearHistory();thumbRenderer=null;glLostAt=0;
+  if(sourceKind==='gen'&&!generator){generator=null;useGen(gen.id,gen,false);}fitCanvas();setTimeout(()=>updateThumbs(),60);note('Graphics restored');return true;}
+ catch(e){console.warn('rebuild failed',reason,e);note('Graphics could not restart. Close and reopen the app; your work is saved.',true);return false;}}
+// Watchdog: about once a second, compare 5 pixels of the incoming picture with the final picture. If a live picture comes out
+// fully black for about 4 s, the feedback memory is cleared; if it stays black 4 s more, the effect responsible is turned off (undoable).
+function watchdog(now){if(now-probeAt<renderer.probeEvery||compare||renderer.freeze||touchFreeze||frozen)return;probeAt=now;
+ // Only while a feedback effect is on (the chains that can lock up); costs one tiny async readback every 2 s.
+ if(!stack.some(e=>e.enabled&&FEEDBACK.includes(e.id))&&!fxPaint.hasPaint){blackRun=0;return;}const r=renderer.probe();if(!r)return;
+ if(r.input>60&&r.output<=6){blackRun++;}else{blackRun=0;return;}
+ if(blackRun===2){renderer.clearHistory();note('The picture went black, so the effect memory was cleared.');}
+ if(blackRun>=4){blackRun=0;const on=stack.filter(e=>e.enabled&&e.intensity>0),bad=on.filter(e=>FEEDBACK.includes(e.id)).at(-1)||on.find(e=>e.id===renderer.lastEffect)||on.at(-1);
+  if(bad){bad.enabled=false;renderer.clearHistory();commit();renderStrip();if(drawerOpen)renderDrawer();note((DEFS.get(bad.id)?.name||'An effect')+' kept the picture black, so it was turned off. Undo brings it back.',true);}}}
+function frame(now){
  if(!renderer||document.hidden)return;
+ if(renderer.gl.isContextLost()){if(!glLostAt)glLostAt=now;else if(now-glLostAt>4000){glLostAt=now;try{renderer.gl.getExtension('WEBGL_lose_context')?.restoreContext();}catch{}}return;}
  const t0=performance.now(),time=now/1000;
  const dt=genLast?Math.min(.1,Math.max(0,time-genLast)):0;genLast=time;stepLfos(lfos,lfoAcc,dt,signals);
  stepTimeline(dt);const T=tl.t;syncTime();drawTimeline();if(review.open)drawTrim();
@@ -113,14 +140,16 @@ function loop(now){
  renderStack.length=stack.length;
  renderer.freeze=frozen||touchFreeze;
  const fxMasks=fxPaint.hasPaint?fxPaint.masks(canvas.width,canvas.height).map(m=>{const i=stack.findIndex(e=>e.id===m.id),e=stack[i];m.values=e?.enabled?renderStack[i].values:(e?.values||[]);return m;}):undefined;
- const w=canvas.width,h=canvas.height,ink=drawing.frame(w,h,time,{...bands,beat:signals.beat,phase:signals.phase});
+ const w=canvas.width,h=canvas.height,ink=drawing.frame(w,h,time,Object.assign(drawSig,bands,{beat:signals.beat,phase:signals.phase}));
  if(ink&&drawOwner.mods.some(m=>m.target===0)){syncDrawOwners();applyMods(drawOwner,modTmp,time,signals);drawing.opacity=Math.min(1,Math.max(0,drawing.opacity*modTmp.values[0]/Math.max(.05,drawOwner.values[0])));}
  const under=ink&&drawing.model.settings.placement==='under';
  renderer.render(under?drawing.composite(source,w,h):source,renderStack,time,compare,{beat:signals.beat,phase:signals.phase,ink:under?null:ink,inkOpacity:drawing.opacity,fxMasks});
+ watchdog(now);
  if(review.open&&review.mode==='live')mirrorReview();
+ if(mapUI?.active())mapUI.frame(now,signals);
  if(rendering?.started)renderTick();
  if(drawerOpen&&liveSliders.length)updateLiveSliders(time);if(drawerOpen&&drawerMode==='keys')syncKeysDrawer();if(drawerOpen&&drawerMode==='lfo')drawLfoScopes();
- if(quality.update(performance.now()-t0,!!capture?.active||!!rendering))ensureSize();
+ perfStat(performance.now()-t0);if(quality.update(performance.now()-t0,!!capture?.active||!!rendering))ensureSize();
  if((sourceKind==='camera'||sourceKind==='video'||sourceKind==='gen')&&tab==='effects'&&now-lastThumbs>4000)updateThumbs();
  if(genGrid&&tab==='source'&&generator&&now-genThumbAt>90){genThumbAt=now;renderGenThumbs(3,time);if(sourceKind==='gen'){generator.resize(...genSize());generator.render(gen.id,genOut.values,genTime,signals,null,gen.id==='text'?textSpec(gen):null);}}
 }
@@ -137,7 +166,9 @@ function lookThumb(look){const c=document.createElement('canvas');c.width=96;c.h
 function updateThumbs(only){
  lastThumbs=performance.now();
  if(!prepThumbSource())return;
+ const sr=$('strip').getBoundingClientRect();
  for(const e of stack){if(only&&e.id!==only)continue;const target=thumbCanvases.get(e.id);if(!target)continue;
+  if(!only){const r=target.getBoundingClientRect();if(!target.isConnected||r.right<sr.left-40||r.left>sr.right+40||!r.width)continue;}
   const one=[{id:e.id,enabled:true,intensity:Math.max(.6,e.intensity),values:e.values.slice(),hold:false,reactive:false}];
   thumbRenderer.clearHistory();const passes=['smear','trails','slit','beat','mosh'].includes(e.id)?4:1;for(let i=0;i<passes;i++)thumbRenderer.render(thumbSrc,one,1+i*.3);
   target.getContext('2d').drawImage(mini,0,0);
@@ -150,7 +181,7 @@ function releaseSource(){stopCamera();if(sourceURL){URL.revokeObjectURL(sourceUR
 function sourceChanged(){if(sourceKind!=='video'&&!DURATIONS.includes(tl.duration)){tl.duration=8;tl.in=0;tl.out=8;tlTouched=false;}if(sourceKind==='video')tlTouched=false;clampRange(tl,mediaDuration());renderCache=null;syncTransport();quality.reset();renderer.clearHistory();ensureSize();fitCanvas();setTimeout(()=>updateThumbs(),120);}
 const useDemo=()=>{releaseSource();source=demo;sourceKind='demo';sourceChanged();};
 function genSize(){const r=$('stage').getBoundingClientRect(),land=r.width>r.height*1.05,long=Math.round(1280*quality.scale/2)*2,short=Math.round(720*quality.scale/2)*2;return land?[long,short]:[short,long];}
-function ensureGenerator(){if(generator)return true;try{generator=new Generator();return true;}catch(e){note(e.message,true);generator=false;return false;}}
+function ensureGenerator(){if(generator)return true;try{generator=new Generator();const gc=generator.canvas;gc?.addEventListener?.('webglcontextlost',e=>{e.preventDefault();});gc?.addEventListener?.('webglcontextrestored',()=>{generator=null;if(sourceKind==='gen')useGen(gen.id,gen,false);});return true;}catch(e){note(e.message,true);generator=false;return false;}}
 function useGen(id,state=null,record=true){if(!ensureGenerator())return;const src=GEN_BY_ID.get(id);if(!src)return;
  if(state)gen=normGen(state)||defaultGen(id);else if(gen.id!==id){const keep=gen.values[3],k={text:gen.text,font:gen.font,align:gen.align,style:gen.style};gen=defaultGen(id);gen.values[3]=keep;Object.assign(gen,k);}if(!gen.keys)gen.keys=[];
  if(!generator.program(id)){note('This source could not start on this device.',true);return;}
@@ -198,7 +229,7 @@ function stepTimeline(dt){
   return;}
  if(stepTime(tl,dt))genTime=tl.t*speedFactor(gen.values[0]);
 }
-function seek(t){t=Math.min(Math.max(0,t),mediaDuration());tl.t=t;if(sourceKind==='video'){try{video.currentTime=t;}catch{}}else genTime=t*speedFactor(gen.values[0]);syncTime();}
+function seek(t){t=Math.min(Math.max(0,t),mediaDuration());if(!Number.isFinite(t))t=0;const jump=Math.abs(t-tl.t)>.25;tl.t=t;if(jump)renderer?.clearHistory?.();if(sourceKind==='video'){try{video.currentTime=t;}catch{}}else genTime=t*speedFactor(gen.values[0]);syncTime();}
 function seekAsync(t){return new Promise(ok=>{if(sourceKind!=='video'){seek(t);return ok();}let done=false;const fin=()=>{if(done)return;done=true;video.removeEventListener('seeked',fin);ok();};video.addEventListener('seeked',fin);seek(t);setTimeout(fin,1500);});}
 function setPlaying(on){if(sourceKind==='video'){if(on)video.play().catch(e=>note(e.message||'Video could not play.',true));else video.pause();}else{if(on&&tl.t>=tl.out-1e-3)seek(tl.in);tl.playing=on;}syncTransport();}
 function syncTransport(){
@@ -264,7 +295,7 @@ function drawTimeline(){
 function bindTimelineCanvas(){
  const c=$('tl-canvas');let mode=null,key=null,moved=false,owner=null;
  const pos=e=>{const r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top,r.width-TL.label-8];};
- c.addEventListener('pointerdown',e=>{const [x,y,w]=pos(e);c.setPointerCapture?.(e.pointerId);moved=false;
+ c.addEventListener('pointerdown',e=>{const [x,y,w]=pos(e);try{c.setPointerCapture?.(e.pointerId);}catch{}moved=false;
   if(x<TL.label-2){mode=null;if(y>=TL.keys[0])openDrawer('keys');else if(y>=TL.wave[0])openDrawer('beat');else openDrawer('timeline');return;}
   if(y<TL.ruler[1]+2){const xi=tlX(tl.in,w),xo=tlX(tl.out,w);if(Math.abs(x-xi)<12&&Math.abs(x-xi)<=Math.abs(x-xo)){mode='in';return;}if(Math.abs(x-xo)<12){mode='out';return;}}
   if(y>=TL.keys[0]-2){owner=keysOwner();key=owner?.keys?.reduce((best,k)=>{const d=Math.abs(tlX(k.t,w)-x);return d<10&&(!best||d<best.d)?{k,d}:best;},null)?.k||null;if(key){mode='key';seek(key.t);return;}}
@@ -287,7 +318,7 @@ async function analyzeMedia(blob){resetBeats();if(!blob)return;const token=beatD
  if(drawerOpen&&drawerMode==='beat')renderDrawer();}
 
 // ---------- UI: tabs, strip, drawer ----------
-function setTab(next){if(next!=='source')genGrid=false;tab=next;app.dataset.tab=tab;updatePill();if(tab==='perform')hudFlash('Finger FX: drag 1–2 fingers · pinch · twist · hold = freeze · tap = stutter');for(const b of document.querySelectorAll('.tab'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));closeDrawer(false);renderStrip();if(tab==='effects')setTimeout(()=>updateThumbs(),30);if(tab==='frames')refreshFrames();if(tab==='motion')openDrawer('lfo');}
+function setTab(next){if(next!=='source')genGrid=false;tab=next;app.dataset.tab=tab;updatePill();if(tab==='perform')hudFlash('Finger FX: drag 1–2 fingers · pinch · twist · hold = freeze · tap = stutter');for(const b of document.querySelectorAll('.tab'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));closeDrawer(false);renderStrip();if(tab==='effects')setTimeout(()=>updateThumbs(),30);if(tab==='frames')refreshFrames();if(tab==='motion')openDrawer('lfo');if(tab==='map')mapUI?.enter();else mapUI?.leave();}
 function tile({label,iconName,thumb,on,selected,action,color,onTap,aria,badge,mods}){
  const b=el('button','tile'+(on?' on':'')+(selected?' selected':'')+(action?' action':'')+(color?' '+color:''));b.type='button';b.setAttribute('aria-label',aria||label);if(on!==undefined)b.setAttribute('aria-pressed',String(!!on));
  const t=el('div','thumb');if(thumb)t.append(thumb);else if(iconName)t.append(icon(iconName));if(badge)t.append(el('span','badge',badge));if(mods)t.append(el('span','mods-dot'));b.append(t,el('span','label',label));b.addEventListener('click',onTap);return b;
@@ -295,7 +326,7 @@ function tile({label,iconName,thumb,on,selected,action,color,onTap,aria,badge,mo
 function renderStrip(){
  syncGenEdit();
  const strip=$('strip'),keep=strip.scrollLeft;strip.replaceChildren();
- ({perform:stripPerform,source:stripSource,effects:stripEffects,draw:stripDraw,frames:stripFrames,looks:stripLooks,motion:stripMotion})[tab](strip);
+ ({perform:stripPerform,source:stripSource,effects:stripEffects,draw:stripDraw,frames:stripFrames,looks:stripLooks,motion:stripMotion,map:s=>mapUI?.strip(s)})[tab](strip);
  strip.scrollLeft=keep;
 }
 function refreshUI(){renderStrip();if(drawerOpen)renderDrawer();}
@@ -303,7 +334,7 @@ function openDrawer(mode){drawerMode=mode;drawerOpen=true;renderDrawer();}
 function closeDrawer(rerender=true){$('drawer').dataset.mode='';liveSliders.length=0;lfoScopes.length=0;drawerOpen=false;drawerMode=null;$('drawer').hidden=true;$('drawer').replaceChildren();syncGenEdit();requestAnimationFrame(fitCanvas);if(rerender)renderStrip();}
 function renderDrawer(){
  const d=$('drawer'),keep=d.dataset.mode===drawerMode+'|'+selectedFx&&!d.hidden?d.scrollTop:0;d.replaceChildren();d.hidden=false;d.dataset.mode=drawerMode+'|'+selectedFx;liveSliders.length=0;lfoScopes.length=0;
- const builders={keys:drawerKeys,beat:drawerBeat,timeline:drawerTimeline,clips:drawerClips,clip:drawerClip,lfo:drawerLfo,genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
+ const builders={map:d=>mapUI.drawer(d,'map'),venues:d=>mapUI.drawer(d,'venues'),keys:drawerKeys,beat:drawerBeat,timeline:drawerTimeline,clips:drawerClips,clip:drawerClip,lfo:drawerLfo,genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
  (builders[drawerMode]||(()=>closeDrawer()))(d);if(keep)d.scrollTop=keep;requestAnimationFrame(fitCanvas);
 }
 function head(d,title,tag,extra=[]){const h=el('div','d-head'),t=el('div','d-title');t.append(el('b',null,title));if(tag)t.append(el('small',null,tag));const close=el('button','tb-btn icon');close.type='button';close.setAttribute('aria-label','Close controls');close.append(icon('close'));close.addEventListener('click',()=>closeDrawer());h.append(t,...extra,close);d.append(h);return h;}
@@ -322,8 +353,8 @@ function cycleBeat(owner,index){const m=beatModOf(owner,index);if(m){if(m.source
 function toggleKeyHere(owner,index,label){
  if(keyAt(owner.keys,index,tl.t)){removeKey(owner.keys,index,tl.t);note('Key removed · '+label+' @ '+fmtTC(tl.t));}
  else{const first=!hasKeys(owner.keys,index),v=index<0?owner.intensity:owner.values[index];if(!setKey(owner.keys,index,tl.t,v))return note('Up to '+MAX_KEYS+' keyframes here. Remove some first.',true);
-  if(stack.includes(owner)&&!owner.enabled){owner.enabled=true;renderer?.clearHistory();}if(first)setPlaying(false);
-  note('◆ '+label+' @ '+fmtTC(tl.t)+(first?' · move the playhead and change the slider to add the next key':''));}
+  if(stack.includes(owner)&&!owner.enabled){owner.enabled=true;renderer?.clearHistory();}
+  note('◆ '+label+' @ '+fmtTC(tl.t)+(first?' · move the playhead, then the slider, for the next key':''));}
  commit();renderStrip();renderDrawer();}
 // LFO · BEAT · ◆ buttons beside a control, a moving indicator while it is modulated, and keyframe follow/auto-key.
 function withLfo(w,label,{owner,index,after},indicator=true){
@@ -335,8 +366,9 @@ function withLfo(w,label,{owner,index,after},indicator=true){
  const keyable=Array.isArray(owner.keys)&&(owner===gen||stack.includes(owner));let kb=null;
  if(keyable){kb=el('button','key-btn');kb.type='button';kb.append(el('span','dia'));kb.setAttribute('aria-label','Keyframe '+label);kb.classList.toggle('track',hasKeys(owner.keys,index));kb.classList.toggle('on',!!keyAt(owner.keys,index,tl.t));kb.addEventListener('click',()=>toggleKeyHere(owner,index,label));mb.append(kb);}
  w.append(mb);const ctl=w.querySelector('input[type=range],select');
- if(keyable&&ctl){ctl.addEventListener(ctl.tagName==='SELECT'?'change':'input',()=>{if(hasKeys(owner.keys,index)){setKey(owner.keys,index,tl.t,index<0?owner.intensity:owner.values[index]);kb.classList.add('on');}});
-  ctl.addEventListener('pointerdown',()=>{ctl._drag=true;});for(const t of ['pointerup','pointercancel','change','blur'])ctl.addEventListener(t,()=>{ctl._drag=false;});}
+ if(keyable&&ctl){ctl.addEventListener(ctl.tagName==='SELECT'?'change':'input',()=>{if(hasKeys(owner.keys,index)){const kt=ctl._kt??tl.t;if(setKey(owner.keys,index,kt,index<0?owner.intensity:owner.values[index]))kb.classList.add('on');else friendly('Up to '+MAX_KEYS+' keyframes here. Remove some first.');}});
+  // One key per drag: the key goes where the playhead was when the finger touched the slider (no key trail while playing).
+  ctl.addEventListener('pointerdown',()=>{ctl._drag=true;ctl._kt=tl.t;});for(const t of ['pointerup','pointercancel','change','blur'])ctl.addEventListener(t,()=>{ctl._drag=false;ctl._kt=null;});}
  if(bm){const amt=el('div','beat-amt'),l=el('label',null,bm.source.toUpperCase()+' intensity'),o=el('output',null,Math.round(bm.depth*100)+'%'),i=el('input');i.type='range';i.min=0;i.max=1;i.step=.01;i.value=bm.depth;i.id='ba'+Math.random().toString(36).slice(2,8);l.htmlFor=i.id;i.setAttribute('aria-label',bm.source+' intensity for '+label);
   i.addEventListener('input',()=>{bm.depth=Number(i.value);o.textContent=Math.round(bm.depth*100)+'%';});i.addEventListener('change',commit);amt.append(l,o,i);w.append(amt);}
  if(!indicator)return;const ind=el('span','lfo-ind'),dot=el('i');ind.append(dot);ind.hidden=true;w.append(ind);liveSliders.push({owner,index,ind,dot,kb,ctl,out:w.querySelector('output'),last:null});
@@ -397,10 +429,11 @@ function drawerFx(d){
  const power=el('button','switch',e.enabled?'ON':'OFF');power.type='button';power.setAttribute('aria-pressed',String(e.enabled));power.setAttribute('aria-label','Effect on or off');
  power.addEventListener('click',()=>{e.enabled=!e.enabled;renderer.clearHistory();commit();renderStrip();renderDrawer();});
  const reset=el('button','tb-btn icon');reset.type='button';reset.setAttribute('aria-label','Reset effect');reset.append(icon('reset'));
- reset.addEventListener('click',()=>{e.intensity=1;e.values=def.params.map(p=>p.value);e.mods=[];e.keys=[];commit();updateThumbs(e.id);renderStrip();renderDrawer();note(def.name+' reset');});
+ reset.addEventListener('click',()=>{const had=(e.keys?.length||0)+(e.mods?.length||0);e.intensity=1;e.values=def.params.map(p=>p.value);e.mods=[];e.keys=[];e.hold=false;renderer.clearHistory();commit();updateThumbs(e.id);renderStrip();renderDrawer();note(def.name+' reset'+(had?' · keys and motions cleared (Undo brings them back)':''));});
  const hasLfo=e.mods.some(m=>isGlobalLfo(m.source)),lfoq=el('button','switch lfo-switch'+(hasLfo?' on':''),'LFO');lfoq.type='button';lfoq.setAttribute('aria-pressed',String(hasLfo));lfoq.setAttribute('aria-label','LFO on this effect');
  lfoq.addEventListener('click',()=>{if(e.mods.some(m=>isGlobalLfo(m.source))){e.mods=e.mods.filter(m=>!isGlobalLfo(m.source));note(def.name+': LFO off');}else{const t=def.params.findIndex(p=>!p.options);toggleLfo(e,t>=0?t:-1);if(!e.enabled){e.enabled=true;renderer.clearHistory();}note(def.name+' → LFO '+(activeLfo+1));}commit();renderStrip();renderDrawer();});
  head(d,def.name,def.tag,[reset,lfoq,power]);
+ if(e.hold&&FEEDBACK.includes(e.id)){const r=el('div','row');r.append(chip('Memory frozen · release',()=>{e.hold=false;renderer.clearHistory();commit();renderDrawer();},true));d.append(r);}
  const live=()=>{saveSession();};
  d.append(slider({label:'Intensity',value:e.intensity,onInput:v=>{e.intensity=v;live();},onChange:()=>{commit();updateThumbs(e.id);},lfo:{owner:e,index:-1}}));
  def.params.forEach((p,i)=>{
@@ -497,7 +530,7 @@ function stripPerform(strip){
  for(const e of stack){const def=DEFS.get(e.id);let c=thumbCanvases.get(e.id);if(!c){c=document.createElement('canvas');c.width=96;c.height=114;thumbCanvases.set(e.id,c);}
   const t=tile({label:def.name,thumb:c,on:e.enabled,selected:selectedFx===e.id,aria:def.name+(e.enabled?' on':' off'),onTap:()=>{if(momentary)return;if(selectedFx!==e.id){selectedFx=e.id;updatePill();if(!e.enabled){e.enabled=true;renderer.clearHistory();commit();}renderStrip();if(drawerOpen)renderDrawer();return;}drawerOpen&&drawerMode==='perform'?closeDrawer():openDrawer('perform');}});
   let prior=null;
-  t.addEventListener('pointerdown',ev=>{if(!momentary)return;ev.preventDefault();t.setPointerCapture?.(ev.pointerId);prior=e.enabled;e.enabled=true;selectedFx=e.id;updatePill();t.classList.add('on','selected');});
+  t.addEventListener('pointerdown',ev=>{if(!momentary)return;ev.preventDefault();try{t.setPointerCapture?.(ev.pointerId);}catch{}prior=e.enabled;e.enabled=true;selectedFx=e.id;updatePill();t.classList.add('on','selected');});
   const release=()=>{if(prior===null)return;e.enabled=prior;prior=null;renderer.clearHistory();renderStrip();};
   t.addEventListener('pointerup',release);t.addEventListener('pointercancel',release);t.addEventListener('lostpointercapture',release);
   strip.append(t);}
@@ -511,7 +544,7 @@ function drawerPerform(d){
  const grid=el('div','map-grid');for(const [k,t]of TOUCH_KEYS)grid.append(select({label:t,options:names,value:e.touch[k],onChange:v=>{e.touch[k]=Number(v);commit();}}));
  d.append(label('What each finger move controls'),grid);
  const row=el('div','row');row.append(chip('Spring back',()=>{e.touch.spring=!e.touch.spring;commit();renderDrawer();renderStrip();},e.touch.spring));
- if(FEEDBACK.includes(e.id))row.append(chip(e.hold?'Release memory':'Hold memory',()=>{e.hold=!e.hold;renderDrawer();},e.hold===true));
+ if(FEEDBACK.includes(e.id))row.append(chip(e.hold?'Memory frozen · release':'Freeze memory',()=>{e.hold=!e.hold;renderer?.clearHistory();commit();renderDrawer();renderStrip();},e.hold===true));
  d.append(row,el('p','section-label','On the preview: 1 finger = XY · 2nd finger = XY 2 · pinch · twist · hold still = freeze · quick tap = stutter'));
 }
 
@@ -708,10 +741,11 @@ function drawerKeys(d){
  nav.append(button('Prev key','left',go(-1)),button('Next key','right',go(1)),button('Delete at '+fmtTC(tl.t),'trash',()=>{let n=0;for(const o of owners)for(const p of keyedParams(o.keys))if(removeKey(o.keys,p,tl.t))n++;if(!n)return note('No keys at the playhead');commit();renderDrawer();note(n+' key'+(n>1?'s':'')+' deleted · Undo to restore');},'danger'));d.append(nav);
  d.append(el('p','hint','Tap ◆ beside any effect or generative slider to key it at the playhead. With keys on, moving the slider writes a key at the playhead. Drag diamonds on the KEYS track to retime.'));
  if(!owners.length){d.append(el('p','empty-note','No keyframes yet.'));return;}
- for(const o of owners){d.append(label(ownerName(o)+' · '+o.keys.length+' KEY'+(o.keys.length>1?'S':'')));
+ const past=owners.reduce((n,o)=>n+o.keys.filter(k=>k.t>tl.duration+1e-6).length,0);if(past)d.append(el('p','hint warn',past+' key'+(past>1?'s are':' is')+' past the end of this source ('+fmtTC(tl.duration)+'); they hold their value. Load a longer source or delete them.'));
+ for(const o of owners){d.append(label(ownerName(o)+' · '+o.keys.length+' KEY'+(o.keys.length>1?'S':'')+(o.enabled===false?' · EFFECT OFF (keys wait)':'')));
   for(const p of keyedParams(o.keys)){const tr=trackOf(o.keys,p),row=el('div','key-track'),top=el('div','kt-top');
    top.append(el('b',null,paramName(o,p)),el('span','kt-val',Math.round((keyValue(o.keys,p,tl.t)??0)*100)+'%'));
-   const lane=el('div','kt-lane');for(const k of tr){const dm=el('button','kt-dia'+(Math.abs(k.t-tl.t)<.5/FPS?' at':''));dm.type='button';dm.style.left=(k.t/Math.max(1e-6,tl.duration)*100).toFixed(2)+'%';dm.setAttribute('aria-label',paramName(o,p)+' key at '+fmtTC(k.t));dm.title=fmtTC(k.t);dm.addEventListener('click',()=>{setPlaying(false);seek(k.t);});lane.append(dm);}
+   const lane=el('div','kt-lane');for(const k of tr){const dm=el('button','kt-dia'+(Math.abs(k.t-tl.t)<.5/FPS?' at':''));dm.type='button';dm.style.left=(Math.min(1,k.t/Math.max(1e-6,tl.duration))*100).toFixed(2)+'%';if(k.t>tl.duration+1e-6)dm.classList.add('past');dm.setAttribute('aria-label',paramName(o,p)+' key at '+fmtTC(k.t));dm.title=fmtTC(k.t);dm.addEventListener('click',()=>{setPlaying(false);seek(k.t);});lane.append(dm);}
    const ph=el('i','kt-ph');ph.style.left=(tl.t/Math.max(1e-6,tl.duration)*100).toFixed(2)+'%';lane.append(ph);
    const eases=el('div','row');const cur=tr.every(k=>k.e==='ease')?'ease':tr.every(k=>k.e==='linear')?'linear':null;for(const [k,name]of EASES)eases.append(chip(name,()=>{for(const x of tr)x.e=k;commit();renderDrawer();},cur===k));
    eases.append(chip('Clear track',()=>{o.keys=o.keys.filter(k=>k.p!==p);commit();renderDrawer();note('Track cleared · Undo to restore');}));
@@ -815,7 +849,7 @@ function bindReview(){
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&review.open)closeReview();});
  const c=$('rv-trim');let mode=null;
  const tAt=e=>{const r=c.getBoundingClientRect(),D=review.mode==='clip'?review.dur:tl.duration;return Math.min(D,Math.max(0,(e.clientX-r.left-16)/(r.width-32)*D));};
- c.addEventListener('pointerdown',e=>{if(rendering)return;c.setPointerCapture?.(e.pointerId);const st=rvState(),t=tAt(e),D=review.mode==='clip'?review.dur:tl.duration,tol=D*14/Math.max(1,c.clientWidth-32);
+ c.addEventListener('pointerdown',e=>{if(rendering)return;try{c.setPointerCapture?.(e.pointerId);}catch{}const st=rvState(),t=tAt(e),D=review.mode==='clip'?review.dur:tl.duration,tol=D*14/Math.max(1,c.clientWidth-32);
   mode=Math.abs(t-st.in)<tol&&Math.abs(t-st.in)<=Math.abs(t-st.out)?'in':Math.abs(t-st.out)<tol?'out':'seek';move(e);});
  const move=e=>{if(!mode)return;const st=rvState(),t=tAt(e),D=review.mode==='clip'?review.dur:tl.duration;
   if(mode==='seek'){if(review.mode==='clip'){try{$('rv-video').currentTime=Math.min(Math.max(t,st.in),st.out);}catch{}}else seek(Math.min(Math.max(t,st.in),st.out));return;}
@@ -874,11 +908,11 @@ function bindStage(){
  const pressure=e=>e.pointerType==='pen'||e.pressure&&e.pressure!==.5?e.pressure:.6;
  canvas.addEventListener('pointerdown',e=>{
   if(tab==='perform')return;
-  if(pointer!==null)return;pointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);const [x,y]=norm(e);
+  if(pointer!==null)return;pointer=e.pointerId;try{canvas.setPointerCapture?.(e.pointerId);}catch{}const [x,y]=norm(e);
   if(tab==='perform')return; // FingerPerformer owns the preview in Perform
   if(tab==='draw'&&fxBrush.on){let size=fxBrush.size,strength=fxBrush.strength;if(fxbOwner.mods.length){syncDrawOwners();applyMods(fxbOwner,modTmp,performance.now()/1000,signals);size=6+modTmp.values[0]*194;strength=modTmp.values[1];}fxPaint.begin(fxBrush.effect,x,y,{size,strength,erase:fxBrush.erase});return;}
   if(tab==='draw'){const s=drawing.model.settings,keep=s.size;if(drawOwner.mods.some(m=>m.target===1)){syncDrawOwners();applyMods(drawOwner,modTmp,performance.now()/1000,signals);s.size=Math.max(1,Math.round(1+modTmp.values[1]*79));}drawing.model.begin(x,y,pressure(e),performance.now()/1000);s.size=keep;return;}
-  start=[e.clientX,e.clientY];const fx=stack.find(s=>s.id===selectedFx&&s.enabled);base=fx?[fx.values[0],fx.values[1]]:null;
+  start=[e.clientX,e.clientY];const fx=stack.find(s=>s.id===selectedFx&&s.enabled);dragKt=tl.t;base=fx?[0,1].map(i=>keyValue(fx.keys||[],i,dragKt)??fx.values[i]):null;
   holdTimer=setTimeout(()=>{compare=true;hud('Original');},260);
  });
  canvas.addEventListener('pointermove',e=>{
@@ -890,7 +924,9 @@ function bindStage(){
    const p0=def.params[0],p1=def.params[1];const parts=[];
    if(p0&&!p0.options){fx.values[0]=Math.min(1,Math.max(0,base[0]+dx/r.width));parts.push(p0.name+' '+formatParam(p0,fx.values[0]));}
    if(p1&&!p1.options){fx.values[1]=Math.min(1,Math.max(0,base[1]-dy/r.height));parts.push(p1.name+' '+formatParam(p1,fx.values[1]));}
-   hud(parts.join('  ·  '));fx._dragged=true;}
+   // Keyed params: the drag edits the key at the playhead (like the slider) instead of a base value the keys would hide.
+   let keyed=false;for(const i of [0,1])if(def.params[i]&&!def.params[i].options&&hasKeys(fx.keys,i)){setKey(fx.keys,i,dragKt,fx.values[i]);keyed=true;}
+   hud(parts.join('  ·  ')+(keyed?'  ·  ◆ '+fmtTC(dragKt):''));fx._dragged=true;}
  });
  const up=e=>{
   if(e.pointerId!==pointer)return;pointer=null;clearTimeout(holdTimer);
@@ -926,7 +962,11 @@ async function boot(){
  if(saved){lfos=normalizeLfos(saved.lfos);drawOwner.mods=normalizeMods(saved.drawMods,3);fxbOwner.mods=normalizeMods(saved.fxbMods,2);}
  try{renderer=new Renderer(canvas);}catch(e){note(e.message||'WebGL is unavailable on this device.',true);return;}
  if(saved?.genActive){useGen(gen.id,gen,false);}
- canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();note('Graphics paused by the system. Reopen the app if the preview stays black.',true);});
+ canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();glLostAt=performance.now();note('Graphics paused by the system. Restoring…',true);});
+ canvas.addEventListener('webglcontextrestored',()=>rebuildRenderer('context restored'));
+ mini.addEventListener('webglcontextlost',e=>{e.preventDefault();});mini.addEventListener('webglcontextrestored',()=>{thumbRenderer=null;setTimeout(()=>updateThumbs(),60);});
+ addEventListener('error',e=>{if(/ResizeObserver/.test(e.message||''))return;friendly('Something went wrong, but your work is saved. If the preview looks stuck, tap Reset.');});
+ addEventListener('unhandledrejection',e=>{const m=String(e.reason?.message||e.reason||'');if(!m||/AbortError|NotAllowedError/.test(m))return;friendly('Something went wrong: '+m.slice(0,90));});
  history.reset({...snapshot(),signature:signature()});syncUndo();
  $('gen-edit').addEventListener('click',editGenText);$('btn-undo').addEventListener('click',()=>restore(history.undo()));
  $('btn-redo').addEventListener('click',()=>restore(history.redo()));
@@ -937,13 +977,17 @@ async function boot(){
  $('file').addEventListener('change',()=>{const f=$('file').files?.[0];$('file').value='';if(f)useFile(f);});
  for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>setTab(b.dataset.tab));
  new ResizeObserver(()=>fitCanvas()).observe($('stage'));
+ {let st=0;$('strip').addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(()=>{if(tab==='effects')updateThumbs();},160);},{passive:true});}
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&capture?.active)capture.stop('app hidden');if(document.hidden&&rendering?.stop){rendering.started=false;rendering.stop();}});
  bindStage();nativeFeel();bindTransport();bindReview();
- performer=new FingerPerformer(canvas,$('touch-overlay'),{enabled:()=>tab==='perform',getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();if(drawerOpen&&drawerMode==='perform')renderDrawer();updateThumbs();}},status:t=>{if(t)hud(t);else hud(null);}});
+ performer=new FingerPerformer(canvas,$('touch-overlay'),{enabled:()=>tab==='perform',getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();if(drawerOpen&&drawerMode==='perform')renderDrawer();updateThumbs();}},status:t=>{if(t)hud(t);else hud(null);},onGrab:grabKeys});
+ const performerOptions=enabled=>({enabled,getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();updateThumbs();}},status:()=>{},onGrab:grabKeys});
+ mapUI=createMapUI({el,icon,tile,chip,button,label,slider,head,note,store,safe,saveBlob,openSheet,closeSheet,Generator,GEN_SOURCES,defaultGen,textSpec,speedFactor,FingerPerformer,performerOptions,mainCanvas:canvas,
+  gen:()=>gen,tab:()=>tab,clipList:()=>clipList,renderStrip,renderDrawer:()=>{if(drawerOpen)renderDrawer();},openDrawer,closeDrawer:()=>closeDrawer(),drawerIs:m=>drawerOpen&&drawerMode===m});
  await frames.init();refreshFrames();await clips.init();refreshClips();
  ensureSize();fitCanvas();renderStrip();requestAnimationFrame(loop);setTimeout(()=>updateThumbs(),200);
  try{if(!store.getItem('brainhertz.pixelpusher.tip16')){store.setItem('brainhertz.pixelpusher.tip16','1');hud('Hold preview = original  ·  drag = tweak effect');setTimeout(()=>hud(null),3800);}}catch{}
  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).catch(()=>{});
- globalThis.__pp={get tl(){return tl;},beatData,clips,get clipList(){return clipList;},refreshClips,openReview,closeReview,get review(){return review;},renderRange,makeClip,useClip,seek,setPlaying,get rendering(){return rendering;},analyzeMedia,get stack(){return stack;},get lfos(){return lfos;},drawOwner,fxbOwner,get signals(){return signals;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
+ globalThis.__pp={get map(){return mapUI?.api;},get renderer(){return renderer;},perf,rebuildRenderer,get blackRun(){return blackRun;},get tl(){return tl;},beatData,clips,get clipList(){return clipList;},refreshClips,openReview,closeReview,get review(){return review;},renderRange,makeClip,useClip,seek,setPlaying,get rendering(){return rendering;},analyzeMedia,get stack(){return stack;},get lfos(){return lfos;},drawOwner,fxbOwner,get signals(){return signals;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
 }
 boot();
