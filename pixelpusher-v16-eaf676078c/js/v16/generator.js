@@ -1,5 +1,6 @@
 // One small WebGL context renders the selected generative source (and grid thumbnails).
-import {SOURCE_BY_ID,PALETTES,fragmentFor,hexToRgb,scaleFactor,darkFlags} from './gen-sources.js';
+import {SOURCE_BY_ID,PALETTES,fragmentFor,hexToRgb,scaleFactor,darkFlags,styleIndex} from './gen-sources.js';
+import {growBloom,hashText} from '../v17/bloom.js';
 export class Generator{
  constructor(){
   this.canvas=document.createElement('canvas');this.canvas.width=720;this.canvas.height=1280;
@@ -9,6 +10,8 @@ export class Generator{
   this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
   this.text=document.createElement('canvas');this.text.width=1024;this.text.height=512;this.textValue=null;
   this.textTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.textTex);for(const [k,v]of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,k,v);
+  this.bloomTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.bloomTex);for(const [k,v]of [[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,k,v);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));this.bloomKey=null;this.style=0;
   this.setText('BRAINHERTZ');
  }
  program(id){
@@ -17,18 +20,21 @@ export class Generator{
   if(!gl.getShaderParameter(fs,gl.COMPILE_STATUS)){this.error=id+': '+gl.getShaderInfoLog(fs);this.failed.add(id);gl.deleteShader(fs);return null;}
   const p=gl.createProgram();gl.attachShader(p,this.vs);gl.attachShader(p,fs);gl.bindAttribLocation(p,0,'aP');gl.linkProgram(p);gl.deleteShader(fs);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS)){this.error=id+': '+gl.getProgramInfoLog(p);this.failed.add(id);return null;}
-  const u={};for(const n of ['Res','Time','Scale','Cx','A','B','Beat','Audio','C0','C1','C2','Text','Dark','NoPink'])u[n]=gl.getUniformLocation(p,'u'+n);
+  const u={};for(const n of ['Res','Time','Scale','Cx','A','B','Beat','Audio','C0','C1','C2','Text','Text2','Style','Dark','NoPink'])u[n]=gl.getUniformLocation(p,'u'+n);
   const prog={p,u};this.programs.set(id,prog);return prog;
  }
  // spec: string or {value,font:'sans'|'mono'|'condensed',align:'left'|'center'|'right'}; multi-line, auto-fit into the 1024x512 text texture.
- setText(spec){if(typeof spec==='string')spec={value:spec};const value=String(spec.value??''),font=spec.font||'sans',align=spec.align||'center',key=font+'|'+align+'|'+value;if(key===this.textValue)return;this.textValue=key;
+ setText(spec){if(typeof spec==='string')spec={value:spec};const value=String(spec.value??''),font=spec.font||'sans',align=spec.align||'center',key=font+'|'+align+'|'+value;this.style=styleIndex(spec.style);if(key===this.textValue){if(spec.style==='bloom')this.bloom();return;}this.textValue=key;
   const c=this.text.getContext('2d');c.setTransform(1,0,0,1,0,0);c.fillStyle='#000';c.fillRect(0,0,1024,512);c.fillStyle='#fff';c.textBaseline='middle';c.textAlign=align;
   const lines=value.split('\n'),squeeze=font==='condensed'?.66:1,face=font==='mono'?'800 SIZEpx ui-monospace,"SF Mono",Menlo,Consolas,monospace':'900 SIZEpx system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif',W=960,H=470;
   const set=s=>{c.font=face.replace('SIZE',s);};let size=Math.min(220,Math.floor(H/(lines.length*1.12)));set(size);
   const widest=()=>Math.max(1,...lines.map(l=>c.measureText(l).width))*squeeze;while(size>14&&widest()>W){size-=4;set(size);}
   const lh=size*1.12,top=256-lh*(lines.length-1)/2,x=align==='left'?32:align==='right'?992:512;
   c.save();c.translate(x,0);c.scale(squeeze,1);lines.forEach((l,i)=>c.fillText(l,0,top+i*lh));c.restore();
-  const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.text);}
+  const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.text);if(spec.style==='bloom')this.bloom();}
+ // Bloom data texture (vines/flowers) is grown once per text layout.
+ bloom(){if(this.bloomKey===this.textValue)return;this.bloomKey=this.textValue;const c=this.text.getContext('2d',{willReadFrequently:true}),img=c.getImageData(0,0,1024,512).data,mask=new Uint8Array(1024*512);for(let i=0;i<mask.length;i++)mask[i]=img[i*4];
+  const out=growBloom(mask,1024,512,hashText(this.textValue));this.bloomStats=out;const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D,this.bloomTex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1024,512,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(out.data.buffer));gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);}
  resize(w,h){if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}}
  // values: [speed, scale, complexity, palette, A, B]; region: optional [x,y,w,h] viewport (thumbnails)
  render(id,values,time,signals={},region=null,text=null){
@@ -37,6 +43,6 @@ export class Generator{
   const pal=PALETTES[Math.round((values[3]||0)*(PALETTES.length-1))]||PALETTES[0],[c0,c1,c2]=pal[1].map(hexToRgb);
   gl.uniform2f(u.Res,w,h);gl.uniform1f(u.Time,time);gl.uniform1f(u.Scale,scaleFactor(values[1]));gl.uniform1f(u.Cx,values[2]);gl.uniform1f(u.A,values[4]);gl.uniform1f(u.B,values[5]);
   gl.uniform1f(u.Beat,signals.beat||0);gl.uniform4f(u.Audio,signals.level||0,signals.low||0,signals.mid||0,signals.high||0);gl.uniform3fv(u.C0,c0);gl.uniform3fv(u.C1,c1);gl.uniform3fv(u.C2,c2);gl.uniform3fv(u.Dark,darkFlags([c0,c1,c2]));gl.uniform1f(u.NoPink,this.noPink===false?0:1);
-  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.uniform1i(u.Text,0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);return true;
+  gl.uniform1f(u.Style,id==='text'?this.style:0);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.bloomTex);gl.uniform1i(u.Text2,1);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.uniform1i(u.Text,0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);return true;
  }
 }

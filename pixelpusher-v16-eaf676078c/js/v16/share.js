@@ -12,4 +12,6 @@ export async function saveBlob(blob,filename,{title='Pixel Pusher'}={}){
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.rel='noopener';document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),30000);return 'downloaded';
 }
+// Save to Photos: native Photos save inside the app wrapper; in a browser the share sheet ("Save Video") or a download.
+export async function saveToPhotos(blob,filename){const bridge=globalThis.PixelPusherNative;if(bridge&&typeof bridge.saveToPhotos==='function'){await bridge.saveToPhotos(blob,filename);return 'photos';}return saveBlob(blob,filename);}
 export const stamp=(d=new Date())=>d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+String(d.getSeconds()).padStart(2,'0');

@@ -1,6 +1,7 @@
 // Original modulation engine: LFO, tempo-locked and audio sources drive effect parameters.
 export const LFO_COUNT=4;
-export const SOURCES=[['lfo1','LFO 1'],['lfo2','LFO 2'],['lfo3','LFO 3'],['lfo4','LFO 4'],['lfo','Own LFO'],['bpm','Tempo'],['level','Audio level'],['low','Bass'],['mid','Mids'],['high','Highs'],['beat','Beat hit']];
+export const SOURCES=[['lfo1','LFO 1'],['lfo2','LFO 2'],['lfo3','LFO 3'],['lfo4','LFO 4'],['lfo','Own LFO'],['bpm','Tempo'],['level','Audio level'],['low','Bass'],['mid','Mids'],['high','Highs'],['beat','Beat hit'],['kick','KICK track'],['hits','HITS track']];
+// 1.7: 'kick' and 'hits' read signals.kick / signals.hits, decaying envelopes from the timeline beat tracks (clip audio or mic).
 export const SHAPES=[['sine','Sine'],['triangle','Triangle'],['square','Square'],['saw','Ramp'],['random','Random S&H']];
 export const DIVISIONS=[4,2,1,.5,.25];
 export const DIVISION_LABELS=['1 bar','1/2','1/4','1/8','1/16'];

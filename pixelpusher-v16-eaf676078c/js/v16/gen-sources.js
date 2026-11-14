@@ -3,6 +3,10 @@
 export const PALETTES=[['Brainhertz',['#ff2b3d','#6e3bff','#2f6cff']],['Ultraviolet',['#4a1cff','#8a4dff','#16084f']],['Ice',['#2f6cff','#00d5ff','#0a1946']],['Toxic',['#27e889','#0d5c34','#6e3bff']],['Infrared',['#ff2b3d','#ff7a1a','#52070f']],['Steel',['#aab3e6','#3d4577','#0b0e20']]];
 export const COMMON=[['Speed',.35],['Scale',.29],['Complexity',.5]];
 export const MAX_TEXT=120,MAX_TEXT_LINES=6,TEXT_FONTS=[['sans','Bold sans'],['mono','Mono'],['condensed','Condensed']],TEXT_ALIGNS=[['left','Left'],['center','Center'],['right','Right']];
+// 1.7 animated text styles (procedural, original). Bloom grows vines/flowers from the letters in green/blue/violet/red only.
+export const TEXT_STYLES=[['glitch','Glitch'],['quake','Quake'],['split','Split'],['broken','Broken open'],['bloom','Bloom']];
+export const STYLE_LABELS={glitch:['Glitch','RGB split'],quake:['Shake','RGB split'],split:['Separation','RGB split'],broken:['Shatter','RGB split'],bloom:['Growth speed','Flower glow']};
+export const styleIndex=st=>Math.max(0,TEXT_STYLES.findIndex(([k])=>k===st));
 const clamp=(n,a=0,b=1)=>Math.min(b,Math.max(a,Number.isFinite(n)?n:a));
 const S=(id,name,a,b,body)=>({id,name,a,b,body});
 export const SOURCES=[
@@ -38,9 +42,28 @@ S('kaleido','Kaleidoscope',['Segments',.4],['Ripple',.4],`float seg=3.+floor(uA*
 float v=fbm(q*(2.+uCx*4.)+t*.3)+.3*sin(r*10.*(.5+uB)-t*2.);return pal(v+r*.3+t*.04)*(.25+v);`),
 S('flow','Flow field',['Curl',.4],['Streaks',.5],`vec2 q=p*(1.5+uCx*3.);for(int i=0;i<4;i++){float n=fbm(q+t*.15);q+=vec2(cos(n*TAU*(1.+uA)),sin(n*TAU*(1.+uA)))*.15;}
 float v=fbm(q*2.);float s=sin((q.x+q.y)*20.*(.3+uB))*.5+.5;return pal(v+t*.03)*(v*.8+s*.5*v)*1.2;`),
-S('text','Glitch text',['Glitch',.25],['RGB split',.3],`vec2 q=uv;float rows=8.+uCx*40.;float row=floor(q.y*rows);float g=step(1.-uA*.7,h21(vec2(row,floor(t*8.))));q.x+=(h21(vec2(row,floor(t*16.)))-.5)*.3*g;
-q=(q-.5)*vec2(1.,uRes.y/uRes.x*2.)/uScale+.5;float sh=.003+uB*.018;float tr=texture2D(uText,q+vec2(sh,0.)).r,tg=texture2D(uText,q).r,tb=texture2D(uText,q-vec2(sh,0.)).r;
-vec3 c=pal(t*.1+q.y)*tg+uC0*max(tr-tg,0.)+uC2*max(tb-tg,0.);c*=.8+.2*sin(gl_FragCoord.y*1.6);return c+pal(.5)*.03;`),
+S('text','Glitch text',['Glitch',.25],['RGB split',.3],`vec2 asp=vec2(1.,uRes.y/uRes.x*2.);float sh=.003+uB*.018;vec3 c=vec3(0.);
+if(uStyle<.5){vec2 q=uv;float rows=8.+uCx*40.;float row=floor(q.y*rows);float g=step(1.-uA*.7,h21(vec2(row,floor(t*8.))));q.x+=(h21(vec2(row,floor(t*16.)))-.5)*.3*g;
+q=(q-.5)*asp/uScale+.5;float tr=texture2D(uText,q+vec2(sh,0.)).r,tg=texture2D(uText,q).r,tb=texture2D(uText,q-vec2(sh,0.)).r;
+c=pal(t*.1+q.y)*tg+uC0*max(tr-tg,0.)+uC2*max(tb-tg,0.);c*=.8+.2*sin(gl_FragCoord.y*1.6);return c+pal(.5)*.03;}
+if(uStyle<1.5){float k=(.006+uA*.05)*(1.+uBeat*2.2+uAudio.y*1.2);vec2 s=(vec2(noise(vec2(t*17.,1.)),noise(vec2(t*19.,7.)))-.5)*k*2.;vec2 q=uv+s;
+float col=floor(q.x*(10.+uCx*30.));q.y+=(h21(vec2(col,floor(t*14.)))-.5)*k*.9;float band=floor(q.y*7.);q.x+=(h21(vec2(band,floor(t*9.)))-.5)*k*2.*step(.72,h21(vec2(band,floor(t*4.))));
+q=(q-.5)*asp/uScale+.5;vec2 d=normalize(s+vec2(1e-4,0.))*sh*(1.+uBeat*2.);float tr=texture2D(uText,q+d).r,tg=texture2D(uText,q).r,tb=texture2D(uText,q-d).r;
+c=addc(pal(t*.07+q.x*.3)*tg,uC0*max(tr-tg,0.));c=addc(c,uC2*max(tb-tg,0.));float dust=step(.985,h21(floor(gl_FragCoord.xy/3.)+floor(t*20.)))*k*12.;return c+pal(.6)*.03+pal(.2)*dust*.4;}
+if(uStyle<2.5){vec2 q=(uv-.5)*asp/uScale+.5;float n=2.+floor(uCx*10.);float kb=floor(q.y*n*2.);float dir=mod(kb,2.)*2.-1.;float sep=(.02+uA*.2)*(.55+.45*sin(t*1.3))+uBeat*.05;
+q.x+=dir*sep*.5;float tg=texture2D(uText,q).r,tf=texture2D(uText,q-vec2(dir*sh*2.5,0.)).r;
+vec3 base=dir>0.?uC0:uC2;c=addc(base*tg,uC1*max(tf-tg,0.)*.85);float sm=fract(q.y*n*2.);float line=smoothstep(.06,0.,min(sm,1.-sm));float near=texture2D(uText,vec2(q.x-dir*sep*.5,q.y)).r+tg;
+return addc(c,vec3(.12,.9,.5)*line*min(near,1.)*(.35+.6*uBeat))+pal(.4)*.025;}
+if(uStyle<3.5){float open=(.12+uA*.88)*(.5-.5*cos(t*.9))+uBeat*.15;vec2 g=uv*vec2(uRes.x/uRes.y,1.)*(4.+uCx*10.);vec2 ip=floor(g),fp=fract(g);float d1=8.,d2=8.;vec2 best=vec2(0.);
+for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){vec2 o=vec2(float(i),float(j));vec2 r=o+h22(ip+o)-fp;float d=dot(r,r);if(d<d1){d2=d1;d1=d;best=ip+o;}else if(d<d2)d2=d;}
+vec2 dir=normalize(h22(best+3.1)-.5+vec2(1e-3,0.));vec2 q=uv-dir*open*.07-vec2(0.,open*.03*h21(best+9.));q=(q-.5)*asp/uScale+.5;vec2 q0=(uv-.5)*asp/uScale+.5;
+float tg=texture2D(uText,q).r,tf=texture2D(uText,q+dir*sh).r,orig=texture2D(uText,q0).r;float crack=smoothstep(.07,0.,sqrt(d2)-sqrt(d1));
+c=addc(pal(h21(best)*.5+t*.04)*tg,uC2*max(tf-tg,0.)*.7);c=addc(c,vec3(.1,.95,.5)*crack*min(1.,open*2.)*max(orig,tg));c=addc(c,uC1*max(orig-tg,0.)*open*.45);return c+pal(.5)*.025;}
+vec2 q=(uv-.5)*asp/uScale+.5;float grow=clamp((.5-.5*cos(t*(.22+uA*.7)))*1.18,0.,1.);vec3 b=(q.x<0.||q.y<0.||q.x>1.||q.y>1.)?vec3(0.):texture2D(uText2,q).rgb;float tg=texture2D(uText,q).r;
+c=pal(t*.05+q.y*.4)*tg*.85;float vb=b.r;float vine=step(.002,vb)*step(vb,grow);float tip=vine*smoothstep(.05,0.,grow-vb);
+c=addc(c,vec3(.07,.82,.4)*vine*(.72+.28*sin(vb*70.-t*3.))+vec3(.55,1.,.75)*tip*.55);
+float fb=b.g;float fl=step(.002,fb)*smoothstep(fb,fb+.07,grow);float id=b.b;vec3 fc=id<.35?vec3(1.,.17,.24):id<.62?vec3(.18,.42,1.):id<.9?vec3(.43,.23,1.):vec3(.62,1.,.4);
+return addc(c,fc*fl*(.75+.25*uB+.35*uBeat));`),
 S('opart','Op-art',['Drift',.4],['Petals',.3],`vec2 o=vec2(sin(t*.3),cos(t*.27))*.3*(.2+uA);float r1=length(p-o),r2=length(p+o);float f=20.+uCx*60.;
 float v=mod(step(.5,fract(r1*f*.25))+step(.5,fract(r2*f*.25)),2.);float tw=sin(atan(p.y,p.x)*(4.+floor(uB*12.))+t)*.5+.5;return mix(vec3(.02),pal(r1*.3+t*.05),v*(.55+.45*tw));`),
 S('rings','Pulse rings',['Rate',.3],['Width',.3],`float r=length(p);vec3 c=vec3(0.);float n=3.+floor(uCx*8.);for(int i=0;i<12;i++){float fi=float(i);if(fi>=n)break;
@@ -67,23 +90,23 @@ float w=.02+uB*.12;float d=abs(p.y-y);c=addc(c,pal(fi/n+p.x*.1+t*.04)*(smoothste
 export const SOURCE_BY_ID=new Map(SOURCES.map(s=>[s.id,s]));
 export const genParams=src=>[...COMMON.map(([name,value])=>({name,value})),{name:'Palette',value:0,max:PALETTES.length-1,step:1,options:PALETTES.map(p=>p[0])},{name:src.a[0],value:src.a[1]},{name:src.b[0],value:src.b[1]}];
 export const DEFAULT_GEN_TOUCH={x:4,y:5,x2:2,y2:0,pinch:1,twist:-2,spring:false};
-export function defaultGen(id='tunnel'){const src=SOURCE_BY_ID.get(id)||SOURCES[0];return {id:src.id,intensity:1,values:genParams(src).map(p=>p.value),mods:[],touch:{...DEFAULT_GEN_TOUCH},text:'BRAINHERTZ',font:'sans',align:'center'};}
+export function defaultGen(id='tunnel'){const src=SOURCE_BY_ID.get(id)||SOURCES[0];return {id:src.id,intensity:1,values:genParams(src).map(p=>p.value),mods:[],touch:{...DEFAULT_GEN_TOUCH},text:'BRAINHERTZ',font:'sans',align:'center',style:'glitch'};}
 export function normalizeGen(raw,normalizeMods){
  const src=SOURCE_BY_ID.get(raw?.id);if(!src)return null;const out=defaultGen(src.id);
  if(Array.isArray(raw.values))out.values=out.values.map((v,i)=>Number.isFinite(raw.values[i])?clamp(raw.values[i]):v);
  out.values[3]=Math.round(out.values[3]*(PALETTES.length-1))/(PALETTES.length-1);
  if(normalizeMods)out.mods=normalizeMods(raw.mods,6);
  for(const k of Object.keys(DEFAULT_GEN_TOUCH)){const n=raw.touch?.[k];if(k==='spring')out.touch.spring=n===true;else if(Number.isInteger(n)&&n>=-2&&n<6)out.touch[k]=n;}
- if(typeof raw.text==='string')out.text=cleanText(raw.text);if(TEXT_FONTS.some(([k])=>k===raw.font))out.font=raw.font;if(TEXT_ALIGNS.some(([k])=>k===raw.align))out.align=raw.align;return out;
+ if(typeof raw.text==='string')out.text=cleanText(raw.text);if(TEXT_FONTS.some(([k])=>k===raw.font))out.font=raw.font;if(TEXT_ALIGNS.some(([k])=>k===raw.align))out.align=raw.align;if(TEXT_STYLES.some(([k])=>k===raw.style))out.style=raw.style;return out;
 }
 // Multi-line text: keeps line breaks (max 6 lines), strips other control characters, 120 chars.
 export function cleanText(s){return String(s).replace(/\r\n?/g,'\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g,'').split('\n').slice(0,MAX_TEXT_LINES).join('\n').slice(0,MAX_TEXT)||' ';}
-export const textSpec=g=>({value:g.text??'BRAINHERTZ',font:g.font||'sans',align:g.align||'center'});
+export const textSpec=g=>({value:g.text??'BRAINHERTZ',font:g.font||'sans',align:g.align||'center',style:g.style||'glitch'});
 export const speedFactor=v=>clamp(v)*2.857;
 export const scaleFactor=v=>.4+clamp(v)*2.1;
 export const HEADER=`precision highp float;
 varying vec2 vUV;
-uniform vec2 uRes;uniform float uTime,uScale,uCx,uA,uB,uBeat;uniform vec4 uAudio;uniform vec3 uC0,uC1,uC2,uDark;uniform float uNoPink;uniform sampler2D uText;
+uniform vec2 uRes;uniform float uTime,uScale,uCx,uA,uB,uBeat;uniform vec4 uAudio;uniform vec3 uC0,uC1,uC2,uDark;uniform float uNoPink,uStyle;uniform sampler2D uText,uText2;
 #define PI 3.14159265
 #define TAU 6.2831853
 float h11(float n){return fract(sin(n*127.1)*43758.5453);}
