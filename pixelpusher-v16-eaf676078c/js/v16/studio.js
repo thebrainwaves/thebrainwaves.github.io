@@ -1,4 +1,4 @@
-// Pixel Pusher 1.6.1 studio shell. Original Brainhertz Productions code; on-device only.
+// Pixel Pusher 1.6.3 studio shell. Original Brainhertz Productions code; on-device only.
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,randomizeStack,QualityController,BeatClock,normalizePreset} from '../core.js';
 import {formatParam} from '../effects.js';
 import {Renderer} from '../gpu.js';
@@ -16,8 +16,10 @@ import {builtinFx,readFx,writeFx} from './fx-presets.js';
 import {FxPaint} from './fx-paint.js';
 import {FingerPerformer,TOUCH_KEYS} from './perform.js';
 import {bindXY} from '../touch.js';
+import {SOURCES as GEN_SOURCES,SOURCE_BY_ID as GEN_BY_ID,genParams,defaultGen,normalizeGen,cleanText,speedFactor,MAX_TEXT} from './gen-sources.js';
+import {Generator} from './generator.js';
 
-export const VERSION='1.6.1';
+export const VERSION='1.6.3';
 const $=id=>document.getElementById(id);
 const DEFS=new Map(EFFECTS.map(e=>[e.id,e]));
 const SESSION_KEY='brainhertz.pixelpusher.session.v16',LOOKS_KEY='brainhertz.pixelpusher.looks.v16';
@@ -35,6 +37,7 @@ let source=null,sourceKind='demo',sourceURL=null,camera=null,facing='environment
 let renderStack=[],frameList=[],thumbURLs=new Map(),fxStore=readFx(store,EFFECTS),userLooks=[],legacyLooks=[],capture=null,lastThumbs=0,beatOrigin=0,animFps=8,animLoops=2;
 const thumbCanvases=new Map();
 const fxPaint=new FxPaint(),fxBrush={on:false,erase:false,effect:'rgb',size:48,strength:1};
+let generator=null,gen=defaultGen('tunnel'),genOut={values:new Array(6).fill(0)},genTime=0,genLast=0,genGrid=false,performSource=false,genThumbAt=0,genThumbIndex=0;const genThumbs=new Map(),libThumbs=new Map();
 let touchAll=false,momentary=false,touchFreeze=false,performer=null;
 const FEEDBACK=['smear','trails','slit','beat','mosh'];
 
@@ -58,15 +61,15 @@ const safe=fn=>async(...a)=>{try{return await fn(...a);}catch(e){note(e?.message
 // ---------- Stack, history, session ----------
 function withMods(list,raw){const byId=new Map((Array.isArray(raw)?raw:[]).filter(x=>x&&typeof x==='object').map(x=>[x.id,x]));return list.map(e=>({...e,mods:normalizeMods(byId.get(e.id)?.mods,DEFS.get(e.id).params.length)}));}
 function setStack(raw){stack=withMods(sanitizeStack(raw),raw);renderStack=stack.map(e=>({id:e.id,enabled:false,intensity:1,values:new Array(6).fill(0),hold:false,reactive:false,reactiveParam:0}));}
-const signature=()=>JSON.stringify(stack.map(e=>[e.id,e.enabled,e.intensity,e.values,e.mods,e.touch]))+'|'+drawing.model.strokes.map(s=>s.seed).join(',')+'|'+fxPaint.strokes.map(s=>s.id).join(',');
-function snapshot(){return {stack:structuredClone(stack),strokes:drawing.model.strokes.slice(),fxStrokes:fxPaint.strokes.slice()};}
+const signature=()=>JSON.stringify(stack.map(e=>[e.id,e.enabled,e.intensity,e.values,e.mods,e.touch]))+'|'+JSON.stringify(gen)+'|'+drawing.model.strokes.map(s=>s.seed).join(',')+'|'+fxPaint.strokes.map(s=>s.id).join(',');
+function snapshot(){return {stack:structuredClone(stack),strokes:drawing.model.strokes.slice(),fxStrokes:fxPaint.strokes.slice(),gen:structuredClone(gen)};}
 function commit(){if(history.push(snapshot(),signature()))saveSession();syncUndo();}
-function restore(entry){if(!entry)return;stack=structuredClone(entry.stack);drawing.model.current=null;drawing.model.strokes=entry.strokes.slice();drawing.model.revision++;drawing.baseKey='';fxPaint.set(entry.fxStrokes||[]);renderer?.clearHistory();saveSession();refreshUI();syncUndo();}
+function restore(entry){if(!entry)return;stack=structuredClone(entry.stack);drawing.model.current=null;drawing.model.strokes=entry.strokes.slice();drawing.model.revision++;drawing.baseKey='';fxPaint.set(entry.fxStrokes||[]);if(entry.gen){const before=gen.id;gen=structuredClone(entry.gen);if(sourceKind==='gen'&&before!==gen.id)renderer?.clearHistory();}renderer?.clearHistory();saveSession();refreshUI();syncUndo();}
 function syncUndo(){$('btn-undo').disabled=!history.canUndo;$('btn-redo').disabled=!history.canRedo;}
 let sessionTimer;
-function saveSession(){clearTimeout(sessionTimer);sessionTimer=setTimeout(()=>{try{store.setItem(SESSION_KEY,JSON.stringify({v:VERSION,stack,drawing:drawing.model.settings,sensitivity}));}catch{/* storage full: session continuity only */}},300);}
+function saveSession(){clearTimeout(sessionTimer);sessionTimer=setTimeout(()=>{try{store.setItem(SESSION_KEY,JSON.stringify({v:VERSION,stack,drawing:drawing.model.settings,sensitivity,gen,genActive:sourceKind==='gen'}));}catch{/* storage full: session continuity only */}},300);}
 function loadSession(){try{const raw=store.getItem(SESSION_KEY);if(!raw||raw.length>1e6)return null;return JSON.parse(raw);}catch{return null;}}
-function loadLooks(){try{const raw=store.getItem(LOOKS_KEY);const list=raw&&raw.length<4e6?JSON.parse(raw):[];userLooks=(Array.isArray(list)?list:[]).slice(0,60).map(v=>{const p=normalizePreset(v);return p?{name:p.name,stack:withMods(p.stack,v.stack)}:null;}).filter(Boolean);}catch{userLooks=[];}
+function loadLooks(){try{const raw=store.getItem(LOOKS_KEY);const list=raw&&raw.length<4e6?JSON.parse(raw):[];userLooks=(Array.isArray(list)?list:[]).slice(0,60).map(v=>{const p=normalizePreset(v);const g=v&&v.gen?normalizeGen(v.gen,normalizeMods):null;return p?{name:p.name,stack:withMods(p.stack,v.stack),...(g?{gen:g}:{})}:null;}).filter(Boolean);}catch{userLooks=[];}
  try{legacyLooks=readPresets(store).presets.map(p=>({name:p.name,stack:p.stack,legacy:true}));}catch{legacyLooks=[];}}
 function saveLooks(){try{store.setItem(LOOKS_KEY,JSON.stringify(userLooks));}catch{note('Local storage is full. Delete a look first.',true);}}
 
@@ -81,6 +84,8 @@ function loop(now){
  if(!renderer||document.hidden)return;
  const t0=performance.now(),time=now/1000;
  if(sourceKind==='demo')drawDemo(time);
+ const dt=genLast?Math.min(.1,Math.max(0,time-genLast)):0;genLast=time;
+ if(sourceKind==='gen'&&generator){applyMods(gen,genOut,time,signals);genTime+=dt*speedFactor(genOut.values[0]);const [gw,gh]=genSize();generator.resize(gw,gh);generator.render(gen.id,genOut.values,genTime,signals,null,gen.id==='text'?gen.text:null);}
  if((sourceKind==='camera'||sourceKind==='video')&&video.readyState<2)return;
  if(!ensureSize())return;
  const level=audio.level(sensitivity),bands=audio.bands(sensitivity);
@@ -94,7 +99,8 @@ function loop(now){
  const under=ink&&drawing.model.settings.placement==='under';
  renderer.render(under?drawing.composite(source,w,h):source,renderStack,time,compare,{beat:signals.beat,phase:signals.phase,ink:under?null:ink,inkOpacity:drawing.opacity,fxMasks});
  if(quality.update(performance.now()-t0,!!capture?.active))ensureSize();
- if((sourceKind==='camera'||sourceKind==='video')&&tab==='effects'&&now-lastThumbs>4000)updateThumbs();
+ if((sourceKind==='camera'||sourceKind==='video'||sourceKind==='gen')&&tab==='effects'&&now-lastThumbs>4000)updateThumbs();
+ if(genGrid&&tab==='source'&&generator&&now-genThumbAt>90){genThumbAt=now;renderGenThumbs(3,time);if(sourceKind==='gen'){generator.resize(...genSize());generator.render(gen.id,genOut.values,genTime,signals,null,gen.id==='text'?gen.text:null);}}
 }
 
 // ---------- Effect thumbnails (second small GL context, refreshed on change) ----------
@@ -119,8 +125,19 @@ function updateThumbs(only){
 // ---------- Sources ----------
 function stopCamera(){if(camera){camera.getTracks().forEach(t=>t.stop());camera=null;}video.srcObject=null;}
 function releaseSource(){stopCamera();if(sourceURL){URL.revokeObjectURL(sourceURL);sourceURL=null;}video.removeAttribute('src');video.load?.();}
-function sourceChanged(){quality.reset();renderer.clearHistory();ensureSize();fitCanvas();setTimeout(()=>updateThumbs(),120);}
+function sourceChanged(){syncTransport();quality.reset();renderer.clearHistory();ensureSize();fitCanvas();setTimeout(()=>updateThumbs(),120);}
 const useDemo=()=>{releaseSource();source=demo;sourceKind='demo';sourceChanged();};
+function genSize(){const r=$('stage').getBoundingClientRect(),land=r.width>r.height*1.05,long=Math.round(1280*quality.scale/2)*2,short=Math.round(720*quality.scale/2)*2;return land?[long,short]:[short,long];}
+function ensureGenerator(){if(generator)return true;try{generator=new Generator();return true;}catch(e){note(e.message,true);generator=false;return false;}}
+function useGen(id,state=null,record=true){if(!ensureGenerator())return;const src=GEN_BY_ID.get(id);if(!src)return;
+ if(state)gen=normalizeGen(state,normalizeMods)||defaultGen(id);else if(gen.id!==id){const keep=gen.values[3];gen=defaultGen(id);gen.values[3]=keep;}
+ if(!generator.program(id)){note('This source could not start on this device.',true);return;}
+ if(sourceKind!=='gen'){releaseSource();}const [gw,gh]=genSize();generator.resize(gw,gh);generator.render(gen.id,gen.values,genTime,signals,null,gen.text);source=generator.canvas;sourceKind='gen';sourceChanged();if(record)commit();}
+function renderGenThumbs(count,time){for(let n=0;n<count;n++){const s=GEN_SOURCES[genThumbIndex%GEN_SOURCES.length];genThumbIndex++;const outs=[genThumbs.get(s.id),libThumbs.get(s.id)].filter(c=>c&&c.isConnected);if(!outs.length)continue;
+ const g=generator.canvas;if(g.width<96||g.height<114)generator.resize(Math.max(96,g.width),Math.max(114,g.height));const v=gen.id===s.id?gen.values:defaultGen(s.id).values.map((x,i)=>i===3?gen.values[3]:x);
+ if(generator.render(s.id,v,time,signals,[0,0,96,114],s.id==='text'?gen.text:null))for(const c of outs)c.getContext('2d').drawImage(generator.canvas,0,generator.canvas.height-114,96,114,0,0,96,114);}
+ // restore the live frame so the main source never shows a thumbnail corner
+ if(sourceKind==='gen')generator.render(gen.id,genOut.values,genTime,signals,null,null);}
 const useCamera=safe(async()=>{
  if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera needs HTTPS and permission.');
  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:false});
@@ -135,8 +152,26 @@ const useFile=safe(async file=>{setTimeout(()=>tab==='source'&&renderStrip(),900
 });
 const useBlob=safe(async blob=>{const out=await decodePhoto(blob,2048);releaseSource();source=out.source;sourceKind='image';sourceChanged();note('Frame is now the source');});
 
+// ---------- Video transport: Play/Pause, Stop (pause + rewind), scrub, loop ----------
+const fmtTime=t=>{t=Number.isFinite(t)?Math.max(0,t):0;return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');};
+let scrubbing=false;
+function syncTransport(){
+ const show=sourceKind==='video';$('transport').hidden=!show;$('stage').classList.toggle('has-transport',show);if(!show)return;
+ const playing=!video.paused&&!video.ended,b=$('vt-play');b.classList.toggle('playing',playing);b.setAttribute('aria-label',playing?'Pause video':'Play video');b.querySelector('use').setAttribute('href',playing?'#i-pause':'#i-play');
+ $('vt-loop').setAttribute('aria-pressed',String(video.loop));syncTime();
+}
+function syncTime(){if(sourceKind!=='video')return;const d=video.duration;if(!scrubbing)$('vt-scrub').value=String(d>0?Math.round(video.currentTime/d*1000):0);$('vt-time').textContent=fmtTime(video.currentTime)+' / '+fmtTime(d);}
+function bindTransport(){
+ $('vt-play').addEventListener('click',()=>{if(video.paused||video.ended)video.play().catch(e=>note(e.message||'Video could not play.',true));else{video.pause();syncTransport();}});
+ $('vt-stop').addEventListener('click',()=>{video.pause();video.currentTime=0;renderer?.clearHistory();syncTransport();});
+ $('vt-loop').addEventListener('click',()=>{video.loop=!video.loop;note(video.loop?'Loop on':'Loop off · plays once');syncTransport();});
+ const scrub=$('vt-scrub');scrub.addEventListener('input',()=>{scrubbing=true;const d=video.duration;if(d>0){video.currentTime=Number(scrub.value)/1000*d;$('vt-time').textContent=fmtTime(video.currentTime)+' / '+fmtTime(d);}});
+ scrub.addEventListener('change',()=>{scrubbing=false;renderer?.clearHistory();syncTime();});
+ for(const t of ['play','pause','ended','loadedmetadata','durationchange'])video.addEventListener(t,syncTransport);video.addEventListener('timeupdate',syncTime);
+}
+
 // ---------- UI: tabs, strip, drawer ----------
-function setTab(next){tab=next;app.dataset.tab=tab;updatePill();if(tab==='perform')hudFlash('Finger FX: drag 1–2 fingers · pinch · twist · hold = freeze · tap = stutter');for(const b of document.querySelectorAll('.tab'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));closeDrawer(false);renderStrip();if(tab==='effects')setTimeout(()=>updateThumbs(),30);if(tab==='frames')refreshFrames();}
+function setTab(next){if(next!=='source')genGrid=false;tab=next;app.dataset.tab=tab;updatePill();if(tab==='perform')hudFlash('Finger FX: drag 1–2 fingers · pinch · twist · hold = freeze · tap = stutter');for(const b of document.querySelectorAll('.tab'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));closeDrawer(false);renderStrip();if(tab==='effects')setTimeout(()=>updateThumbs(),30);if(tab==='frames')refreshFrames();}
 function tile({label,iconName,thumb,on,selected,action,color,onTap,aria,badge,mods}){
  const b=el('button','tile'+(on?' on':'')+(selected?' selected':'')+(action?' action':'')+(color?' '+color:''));b.type='button';b.setAttribute('aria-label',aria||label);if(on!==undefined)b.setAttribute('aria-pressed',String(!!on));
  const t=el('div','thumb');if(thumb)t.append(thumb);else if(iconName)t.append(icon(iconName));if(badge)t.append(el('span','badge',badge));if(mods)t.append(el('span','mods-dot'));b.append(t,el('span','label',label));b.addEventListener('click',onTap);return b;
@@ -151,7 +186,7 @@ function openDrawer(mode){drawerMode=mode;drawerOpen=true;renderDrawer();}
 function closeDrawer(rerender=true){drawerOpen=false;drawerMode=null;$('drawer').hidden=true;$('drawer').replaceChildren();requestAnimationFrame(fitCanvas);if(rerender)renderStrip();}
 function renderDrawer(){
  const d=$('drawer');d.replaceChildren();d.hidden=false;
- const builders={perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
+ const builders={genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
  (builders[drawerMode]||(()=>closeDrawer()))(d);requestAnimationFrame(fitCanvas);
 }
 function head(d,title,tag,extra=[]){const h=el('div','d-head'),t=el('div','d-title');t.append(el('b',null,title));if(tag)t.append(el('small',null,tag));const close=el('button','tb-btn icon');close.type='button';close.setAttribute('aria-label','Close controls');close.append(icon('close'));close.addEventListener('click',()=>closeDrawer());h.append(t,...extra,close);d.append(h);return h;}
@@ -262,10 +297,11 @@ function drawerFxBrush(d){
 }
 
 // Perform: finger control restored from v1.5 (picture touch, XY pad, mappings, spring, hold memory, momentary)
-function performTargets(){if(touchAll)return stack.filter(e=>e.enabled);const e=stack.find(x=>x.id===selectedFx);if(e){if(!e.enabled){e.enabled=true;renderer.clearHistory();renderStrip();}return [e];}const on=stack.filter(x=>x.enabled);return on.length?on:[];}
+function performTargets(){if(performSource&&sourceKind==='gen')return touchAll?[gen,...stack.filter(e=>e.enabled)]:[gen];if(touchAll)return stack.filter(e=>e.enabled);const e=stack.find(x=>x.id===selectedFx);if(e){if(!e.enabled){e.enabled=true;renderer.clearHistory();renderStrip();}return [e];}const on=stack.filter(x=>x.enabled);return on.length?on:[];}
 function stripPerform(strip){
  const sel=stack.find(e=>e.id===selectedFx);
  strip.append(tile({label:touchAll?'All active':'Selected only',iconName:'finger',action:true,color:touchAll?'blue':'',aria:'Fingers control '+(touchAll?'all active effects':'the selected effect'),onTap:()=>{touchAll=!touchAll;note(touchAll?'Fingers drive every active effect':'Fingers drive the selected effect');renderStrip();updatePill();}}));
+ if(sourceKind==='gen')strip.append(tile({label:'Source',iconName:'grid',on:performSource,selected:performSource,aria:'Fingers drive the generative source',onTap:()=>{performSource=!performSource;note(performSource?'Fingers drive '+GEN_BY_ID.get(gen.id).name:'Fingers drive effects');renderStrip();updatePill();}}));
  strip.append(tile({label:'XY pad',iconName:'grid',action:true,color:'blue',onTap:()=>{if(!sel)return note('Pick an effect below first.');drawerOpen&&drawerMode==='perform'?closeDrawer():openDrawer('perform');}}));
  const springOn=sel?.touch?.spring===true;
  strip.append(tile({label:'Spring back',iconName:'reset',on:springOn,aria:'Spring back on release',onTap:()=>{const list=touchAll?stack.filter(e=>e.enabled):sel?[sel]:[];if(!list.length)return note('Pick an effect first.');const v=!springOn;for(const e of list)e.touch.spring=v;commit();renderStrip();}}));
@@ -360,9 +396,9 @@ const buildAnimation=safe(async()=>{
 // Looks
 const NEW_LOOKS=[['Night broadcast',{scan:[.5,.55,.55,.35],grain:[.35,.2,.3,.6],rgb:[.12,.1]}],['Mosh bloom',{mosh:[.82,.4,.25,.6],rgb:[.18,.3]}],['Cold signal',{vhs:[.3,.4,.2,.5],scan:[.3,.35,.5,.3],hue:[.6,0,.6]}]];
 const builtins=()=>[...PRESETS.filter(p=>!p.shader),...NEW_LOOKS.map(([name,cfg])=>({name,stack:defaultStack().map(e=>({...e,enabled:!!cfg[e.id],values:e.values.map((v,i)=>cfg[e.id]?.[i]??v)}))}))];
-function loadLook(p){setStack(p.stack);renderer.clearHistory();commit();setTimeout(()=>updateThumbs(),30);note(p.name);}
+function loadLook(p){setStack(p.stack);if(p.gen)useGen(p.gen.id,p.gen,false);renderer.clearHistory();commit();setTimeout(()=>updateThumbs(),30);note(p.name);}
 function stripLooks(strip){
- strip.append(tile({label:'Save look',iconName:'plus',action:true,color:'red',onTap:()=>{if(userLooks.length>=60)return note('60 looks max. Delete one first.',true);userLooks.push({name:'Look '+(userLooks.length+1),stack:structuredClone(stack)});saveLooks();renderStrip();note('Look saved');}}));
+ strip.append(tile({label:'Save look',iconName:'plus',action:true,color:'red',onTap:()=>{if(userLooks.length>=60)return note('60 looks max. Delete one first.',true);userLooks.push({name:'Look '+(userLooks.length+1),stack:structuredClone(stack),...(sourceKind==='gen'?{gen:structuredClone(gen)}:{})});saveLooks();renderStrip();note('Look saved');}}));
  strip.append(tile({label:'Shuffle',iconName:'shuffle',action:true,color:'blue',onTap:()=>{setStack(randomizeStack(stack).map((e,i)=>({...e,mods:stack[i]?.mods||[]})));renderer.clearHistory();commit();updateThumbs();renderStrip();}}));
  strip.append(tile({label:'All off',iconName:'power',action:true,onTap:()=>{for(const e of stack)e.enabled=false;commit();renderStrip();}}));
  strip.append(el('span','divider'));
@@ -373,13 +409,55 @@ function stripLooks(strip){
 function drawerLook(d){
  const p=userLooks[selectedLook];if(!p)return closeDrawer();head(d,p.name,'SAVED LOOK');
  const w=el('div','slider'),l=el('label',null,'Name'),i=el('input');i.type='text';i.maxLength=40;i.value=p.name;i.id='look-name';l.htmlFor=i.id;i.addEventListener('change',()=>{p.name=i.value.trim().slice(0,40)||p.name;saveLooks();renderStrip();renderDrawer();});w.append(l,el('output'),i);d.append(w);
- const row=el('div','row');row.append(button('Update with current','check',()=>{p.stack=structuredClone(stack);saveLooks();note('Look updated');},'blue'),button('Delete','trash',()=>{userLooks.splice(selectedLook,1);selectedLook=null;saveLooks();closeDrawer();},'danger'));d.append(row);
+ const row=el('div','row');row.append(button('Update with current','check',()=>{p.stack=structuredClone(stack);if(sourceKind==='gen')p.gen=structuredClone(gen);else delete p.gen;saveLooks();note('Look updated');},'blue'),button('Delete','trash',()=>{userLooks.splice(selectedLook,1);selectedLook=null;saveLooks();closeDrawer();},'danger'));d.append(row);
 }
 
 // Source (same tab menu as everything else)
 function pickFile(accept){const f=$('file');f.accept=accept;f.click();}
 const cameraTap=side=>()=>{facing=side;useCamera().then(()=>renderStrip());};
+function stripGen(strip){
+ strip.append(tile({label:'Sources',iconName:'left',action:true,aria:'Back to sources',onTap:()=>{genGrid=false;renderStrip();}}));
+ strip.append(tile({label:'Tune',iconName:'sliders',action:true,color:'blue',aria:'Tune generative source',onTap:()=>{if(sourceKind!=='gen')useGen(gen.id);drawerOpen&&drawerMode==='gen'?closeDrawer():openDrawer('gen');}}));
+ strip.append(tile({label:'Library',iconName:'grid',action:true,color:'purple',aria:'Generative library grid',onTap:()=>{drawerOpen&&drawerMode==='genlib'?closeDrawer():openDrawer('genlib');}}));
+ strip.append(el('span','divider'));
+ const study=demo;strip.append(tile({label:'Signal study',thumb:(()=>{const c=document.createElement('canvas');c.width=96;c.height=114;c.getContext('2d').drawImage(study,0,0,720,960,0,0,96,128);return c;})(),on:sourceKind==='demo',selected:sourceKind==='demo',aria:'Generative demo input',onTap:()=>{useDemo();renderStrip();}}));
+ for(const s of GEN_SOURCES){let c=genThumbs.get(s.id);if(!c){c=document.createElement('canvas');c.width=96;c.height=114;genThumbs.set(s.id,c);}const active=sourceKind==='gen'&&gen.id===s.id;
+  strip.append(tile({label:s.name,thumb:c,on:active,selected:active,aria:'Generative: '+s.name,mods:active&&gen.mods.length>0,onTap:()=>{if(active){drawerOpen&&drawerMode==='gen'?closeDrawer():openDrawer('gen');return;}useGen(s.id);renderStrip();if(drawerOpen&&drawerMode==='gen')renderDrawer();}}));}
+ if(generator)renderGenThumbs(GEN_SOURCES.length,performance.now()/1000);
+}
+function drawerGenLib(d){
+ head(d,'Generative library',GEN_SOURCES.length+' GPU SOURCES · TAP TO PLAY');const grid=el('div','gen-grid');
+ const pick=fn=>()=>{const y=d.scrollTop;fn();renderStrip();renderDrawer();d.scrollTop=y;};
+ const sc=document.createElement('canvas');sc.width=96;sc.height=114;sc.getContext('2d').drawImage(demo,0,0,720,960,0,0,96,128);
+ grid.append(tile({label:'Signal study',thumb:sc,on:sourceKind==='demo',selected:sourceKind==='demo',aria:'Library: Signal study',onTap:pick(()=>useDemo())}));
+ for(const s of GEN_SOURCES){let c=libThumbs.get(s.id);if(!c){c=document.createElement('canvas');c.width=96;c.height=114;libThumbs.set(s.id,c);}const active=sourceKind==='gen'&&gen.id===s.id;
+  grid.append(tile({label:s.name,thumb:c,on:active,selected:active,aria:'Library: '+s.name,onTap:pick(()=>{if(!active)useGen(s.id);})}));}
+ d.append(grid);if(generator)renderGenThumbs(GEN_SOURCES.length,performance.now()/1000);
+}
+function drawerGen(d){
+ if(sourceKind!=='gen')return closeDrawer();const src=GEN_BY_ID.get(gen.id),params=genParams(src);
+ const reset=el('button','tb-btn icon');reset.type='button';reset.setAttribute('aria-label','Reset source');reset.append(icon('reset'));reset.addEventListener('click',()=>{const keep=gen.text;gen=defaultGen(gen.id);gen.text=keep;commit();renderDrawer();note(src.name+' reset');});
+ head(d,src.name,'GENERATIVE SOURCE',[reset]);
+ params.forEach((p,i)=>{if(p.options){const row=el('div','row');p.options.forEach((name,n)=>row.append(chip(name,()=>{gen.values[i]=n/p.max;commit();renderDrawer();},Math.round(gen.values[i]*p.max)===n)));d.append(label('Palette'),row);}
+  else d.append(slider({label:p.name,value:gen.values[i],onInput:v=>{gen.values[i]=v;saveSession();},onChange:()=>commit()}));});
+ if(gen.id==='text'){const w=el('div','slider'),l=el('label',null,'Text'),i=el('input');i.type='text';i.maxLength=MAX_TEXT;i.value=gen.text;i.id='gen-text';i.autocomplete='off';i.spellcheck=false;l.htmlFor=i.id;
+  i.addEventListener('input',()=>{gen.text=cleanText(i.value);});i.addEventListener('change',()=>{gen.text=cleanText(i.value);commit();});w.append(l,el('output'),i);d.append(w);}
+ const add=chip('+ Add',()=>{if(gen.mods.length>=MAX_MODS)return note('Up to '+MAX_MODS+' motions.',true);gen.mods.push(normalizeMods([{target:4,source:audioMode==='none'?'lfo':'level'}],6)[0]);commit();renderDrawer();});
+ d.append(label('Motion (LFO · tempo · audio)',add));
+ const targets=params.map((p,i)=>[i,p.name]).filter(([i])=>i!==3);
+ gen.mods.forEach((m,mi)=>{const box=el('div','mod'),grid=el('div','mod-grid');
+  grid.append(select({label:'Moves',options:targets,value:m.target<0?0:m.target,onChange:v=>{m.target=Number(v);commit();}}),select({label:'Driven by',options:SOURCES,value:m.source,onChange:v=>{m.source=v;commit();renderDrawer();}}));
+  if(m.source==='lfo'||m.source==='bpm')grid.append(select({label:'Shape',options:SHAPES,value:m.shape,onChange:v=>{m.shape=v;commit();}}));
+  if(m.source==='bpm')grid.append(select({label:'Rate',options:DIVISION_LABELS.map((t,i)=>[i,t]),value:m.division,onChange:v=>{m.division=Number(v);commit();}}));
+  if(m.source==='lfo')grid.append(slider({label:'Speed',value:m.rate,format:v=>(.05*Math.pow(160,v)).toFixed(2)+' Hz',onInput:v=>{m.rate=v;},onChange:commit}));
+  grid.append(slider({label:'Depth',value:m.depth,onInput:v=>{m.depth=v;},onChange:commit}));box.append(grid,chip('Remove',()=>{gen.mods.splice(mi,1);commit();renderDrawer();}));d.append(box);});
+ const names=[[-2,'Nothing'],...params.map((p,i)=>[i,p.name]).filter(([i])=>i!==3)];const mg=el('div','map-grid');
+ for(const [k,t]of TOUCH_KEYS)mg.append(select({label:t,options:names,value:gen.touch[k],onChange:v=>{gen.touch[k]=Number(v);commit();}}));
+ const fr=el('div','row');fr.append(chip(performSource?'Fingers drive source ✓':'Fingers drive source',()=>{performSource=!performSource;renderDrawer();updatePill();},performSource),chip('Spring back',()=>{gen.touch.spring=!gen.touch.spring;commit();renderDrawer();},gen.touch.spring));
+ d.append(label('Perform fingers'),fr,mg);
+}
 function stripSource(strip){
+ if(genGrid)return stripGen(strip);
  const live=sourceKind==='camera';
  strip.append(tile({label:'Rear cam',aria:'Back camera',iconName:'source',on:live&&facing==='environment',selected:live&&facing==='environment',onTap:cameraTap('environment')}));
  strip.append(tile({label:'Selfie cam',aria:'Front camera',iconName:'source',on:live&&facing==='user',selected:live&&facing==='user',onTap:cameraTap('user')}));
@@ -387,7 +465,7 @@ function stripSource(strip){
  strip.append(el('span','divider'));
  strip.append(tile({label:'Photo',iconName:'image',on:sourceKind==='image',selected:sourceKind==='image',onTap:()=>pickFile('image/*')}));
  strip.append(tile({label:'Video',iconName:'film',on:sourceKind==='video',selected:sourceKind==='video',onTap:()=>pickFile('video/*')}));
- strip.append(tile({label:'Generative',iconName:'grid',on:sourceKind==='demo',selected:sourceKind==='demo',aria:'Generative demo input',onTap:()=>{useDemo();renderStrip();}}));
+ strip.append(tile({label:'Generative',iconName:'grid',on:sourceKind==='gen'||sourceKind==='demo',selected:sourceKind==='gen'||sourceKind==='demo',badge:String(GEN_SOURCES.length+1),aria:'Generative sources',onTap:()=>{ensureGenerator();genGrid=true;renderStrip();openDrawer('genlib');$('strip').scrollLeft=0;}}));
  strip.append(tile({label:'Last frame',iconName:'frame',action:true,aria:'Use last captured frame as source',onTap:()=>{const f=frameList.at(-1);if(!f)return note('Capture a frame first (Frames tab).');useBlob(f.blob).then(()=>renderStrip());}}));
 }
 
@@ -464,7 +542,7 @@ function bindStage(){
  };
  canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
 }
-function updatePill(){const p=$('mode-pill');if(tab==='perform'){p.hidden=false;p.className='mode-pill';p.textContent='FINGER FX · '+(touchAll?'ALL ACTIVE':(DEFS.get(selectedFx)?.name||'ACTIVE').toUpperCase());}else if(tab==='draw'&&fxBrush.on){p.hidden=false;p.className='mode-pill fx';p.textContent=fxBrush.erase?'FX ERASE':'FX BRUSH · '+(DEFS.get(fxBrush.effect)?.name||'').toUpperCase();}else p.hidden=true;}
+function updatePill(){const p=$('mode-pill');if(tab==='perform'){p.hidden=false;p.className='mode-pill';p.textContent='FINGER FX · '+(performSource&&sourceKind==='gen'?GEN_BY_ID.get(gen.id).name.toUpperCase()+(touchAll?' + FX':''):touchAll?'ALL ACTIVE':(DEFS.get(selectedFx)?.name||'ACTIVE').toUpperCase());}else if(tab==='draw'&&fxBrush.on){p.hidden=false;p.className='mode-pill fx';p.textContent=fxBrush.erase?'FX ERASE':'FX BRUSH · '+(DEFS.get(fxBrush.effect)?.name||'').toUpperCase();}else p.hidden=true;}
 function hudFlash(text){hud(text);clearTimeout(hudFlash.t);hudFlash.t=setTimeout(()=>hud(null),3200);}
 let hudTimer;function hud(text){const h=$('hud');clearTimeout(hudTimer);if(!text){hudTimer=setTimeout(()=>h.hidden=true,500);return;}h.textContent=text;h.hidden=false;}
 
@@ -483,7 +561,9 @@ async function boot(){
  if(saved?.drawing){drawing.model.restore({strokes:[],settings:saved.drawing});}
  if(Number.isFinite(saved?.sensitivity))sensitivity=Math.min(4,Math.max(.5,saved.sensitivity));
  loadLooks();
+ if(saved?.gen){const g=normalizeGen(saved.gen,normalizeMods);if(g)gen=g;}
  try{renderer=new Renderer(canvas);}catch(e){note(e.message||'WebGL is unavailable on this device.',true);return;}
+ if(saved?.genActive){useGen(gen.id,gen,false);}
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();note('Graphics paused by the system. Reopen the app if the preview stays black.',true);});
  history.reset({...snapshot(),signature:signature()});syncUndo();
  $('btn-undo').addEventListener('click',()=>restore(history.undo()));
@@ -496,12 +576,12 @@ async function boot(){
  for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>setTab(b.dataset.tab));
  new ResizeObserver(()=>fitCanvas()).observe($('stage'));
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&capture?.active)capture.stop('app hidden');});
- bindStage();nativeFeel();
+ bindStage();nativeFeel();bindTransport();
  performer=new FingerPerformer(canvas,$('touch-overlay'),{enabled:()=>tab==='perform',getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();if(drawerOpen&&drawerMode==='perform')renderDrawer();updateThumbs();}},status:t=>{if(t)hud(t);else hud(null);}});
  await frames.init();refreshFrames();
  ensureSize();fitCanvas();renderStrip();requestAnimationFrame(loop);setTimeout(()=>updateThumbs(),200);
  try{if(!store.getItem('brainhertz.pixelpusher.tip16')){store.setItem('brainhertz.pixelpusher.tip16','1');hud('Hold preview = original  ·  drag = tweak effect');setTimeout(()=>hud(null),3800);}}catch{}
  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).catch(()=>{});
- globalThis.__pp={get stack(){return stack;},fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
+ globalThis.__pp={get stack(){return stack;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
 }
 boot();
