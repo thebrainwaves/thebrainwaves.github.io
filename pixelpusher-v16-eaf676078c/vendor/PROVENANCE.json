@@ -1,0 +1,14 @@
+{
+  "package": "three",
+  "version": "0.187.0",
+  "source": "https://www.npmjs.com/package/three/v/0.187.0",
+  "license": "MIT",
+  "license_file": "THREE-LICENSE.txt",
+  "build_tool": "esbuild 0.28.2",
+  "entry": "../../tools/three-entry.js",
+  "bundle": "three-selected.js",
+  "bytes": 545000,
+  "gzip_bytes": 138184,
+  "sha256": "7699f97159aa4c40afdc6c934da94417ef496f0c35cbdf0a7e8516806b76132f",
+  "notes": "Selected renderer, scene, geometry and material exports. No loaders, examples, controls, animation system entrypoints or third-party visual shaders imported. Internal renderer dependencies are included by tree shaking."
+}
