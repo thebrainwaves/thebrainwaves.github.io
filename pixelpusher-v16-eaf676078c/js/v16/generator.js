@@ -1,5 +1,5 @@
 // One small WebGL context renders the selected generative source (and grid thumbnails).
-import {SOURCE_BY_ID,PALETTES,fragmentFor,hexToRgb,scaleFactor} from './gen-sources.js';
+import {SOURCE_BY_ID,PALETTES,fragmentFor,hexToRgb,scaleFactor,darkFlags} from './gen-sources.js';
 export class Generator{
  constructor(){
   this.canvas=document.createElement('canvas');this.canvas.width=720;this.canvas.height=1280;
@@ -17,11 +17,17 @@ export class Generator{
   if(!gl.getShaderParameter(fs,gl.COMPILE_STATUS)){this.error=id+': '+gl.getShaderInfoLog(fs);this.failed.add(id);gl.deleteShader(fs);return null;}
   const p=gl.createProgram();gl.attachShader(p,this.vs);gl.attachShader(p,fs);gl.bindAttribLocation(p,0,'aP');gl.linkProgram(p);gl.deleteShader(fs);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS)){this.error=id+': '+gl.getProgramInfoLog(p);this.failed.add(id);return null;}
-  const u={};for(const n of ['Res','Time','Scale','Cx','A','B','Beat','Audio','C0','C1','C2','Text'])u[n]=gl.getUniformLocation(p,'u'+n);
+  const u={};for(const n of ['Res','Time','Scale','Cx','A','B','Beat','Audio','C0','C1','C2','Text','Dark','NoPink'])u[n]=gl.getUniformLocation(p,'u'+n);
   const prog={p,u};this.programs.set(id,prog);return prog;
  }
- setText(value){if(value===this.textValue)return;this.textValue=value;const c=this.text.getContext('2d');c.fillStyle='#000';c.fillRect(0,0,1024,512);c.fillStyle='#fff';c.textAlign='center';c.textBaseline='middle';
-  let size=220;c.font=`900 ${size}px system-ui,-apple-system,sans-serif`;while(size>40&&c.measureText(value).width>960){size-=10;c.font=`900 ${size}px system-ui,-apple-system,sans-serif`;}c.fillText(value,512,262);
+ // spec: string or {value,font:'sans'|'mono'|'condensed',align:'left'|'center'|'right'}; multi-line, auto-fit into the 1024x512 text texture.
+ setText(spec){if(typeof spec==='string')spec={value:spec};const value=String(spec.value??''),font=spec.font||'sans',align=spec.align||'center',key=font+'|'+align+'|'+value;if(key===this.textValue)return;this.textValue=key;
+  const c=this.text.getContext('2d');c.setTransform(1,0,0,1,0,0);c.fillStyle='#000';c.fillRect(0,0,1024,512);c.fillStyle='#fff';c.textBaseline='middle';c.textAlign=align;
+  const lines=value.split('\n'),squeeze=font==='condensed'?.66:1,face=font==='mono'?'800 SIZEpx ui-monospace,"SF Mono",Menlo,Consolas,monospace':'900 SIZEpx system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif',W=960,H=470;
+  const set=s=>{c.font=face.replace('SIZE',s);};let size=Math.min(220,Math.floor(H/(lines.length*1.12)));set(size);
+  const widest=()=>Math.max(1,...lines.map(l=>c.measureText(l).width))*squeeze;while(size>14&&widest()>W){size-=4;set(size);}
+  const lh=size*1.12,top=256-lh*(lines.length-1)/2,x=align==='left'?32:align==='right'?992:512;
+  c.save();c.translate(x,0);c.scale(squeeze,1);lines.forEach((l,i)=>c.fillText(l,0,top+i*lh));c.restore();
   const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.text);}
  resize(w,h){if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}}
  // values: [speed, scale, complexity, palette, A, B]; region: optional [x,y,w,h] viewport (thumbnails)
@@ -30,7 +36,7 @@ export class Generator{
   const [x,y,w,h]=region||[0,0,this.canvas.width,this.canvas.height];gl.viewport(x,y,w,h);gl.useProgram(prog.p);
   const pal=PALETTES[Math.round((values[3]||0)*(PALETTES.length-1))]||PALETTES[0],[c0,c1,c2]=pal[1].map(hexToRgb);
   gl.uniform2f(u.Res,w,h);gl.uniform1f(u.Time,time);gl.uniform1f(u.Scale,scaleFactor(values[1]));gl.uniform1f(u.Cx,values[2]);gl.uniform1f(u.A,values[4]);gl.uniform1f(u.B,values[5]);
-  gl.uniform1f(u.Beat,signals.beat||0);gl.uniform4f(u.Audio,signals.level||0,signals.low||0,signals.mid||0,signals.high||0);gl.uniform3fv(u.C0,c0);gl.uniform3fv(u.C1,c1);gl.uniform3fv(u.C2,c2);
+  gl.uniform1f(u.Beat,signals.beat||0);gl.uniform4f(u.Audio,signals.level||0,signals.low||0,signals.mid||0,signals.high||0);gl.uniform3fv(u.C0,c0);gl.uniform3fv(u.C1,c1);gl.uniform3fv(u.C2,c2);gl.uniform3fv(u.Dark,darkFlags([c0,c1,c2]));gl.uniform1f(u.NoPink,this.noPink===false?0:1);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.uniform1i(u.Text,0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);return true;
  }
 }

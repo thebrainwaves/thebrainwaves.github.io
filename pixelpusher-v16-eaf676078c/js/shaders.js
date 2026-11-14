@@ -24,6 +24,11 @@ float hash(vec2 v){return fract(sin(dot(v,vec2(41.13,289.7)))*43758.5453);}
 vec2 safe(vec2 v){return clamp(v,vec2(.001),vec2(.999));}
 vec3 sampleAt(vec2 p){return TEX(uFrame,safe(p)).rgb;}
 float lum(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
+// No pink (Brainhertz rule): if an effect turns a non-pink pixel pink/magenta (e.g. red/blue channel fringes),
+// push it to violet or deep red. Pink that was already in the user's own photo/video is left alone.
+vec3 rgb2hsv(vec3 c){vec4 K=vec4(0.,-1./3.,2./3.,-1.);vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g));vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r));float d=q.x-min(q.w,q.y);return vec3(abs(q.z+(q.w-q.y)/(6.*d+1e-10)),d/(q.x+1e-10),q.x);}
+vec3 hsv2rgb(vec3 c){vec3 p=abs(fract(c.xxx+vec3(1.,2./3.,1./3.))*6.-3.);return c.z*mix(vec3(1.),clamp(p-1.,0.,1.),c.y);}
+bool pinkish(vec3 h){return h.y>=.25&&h.x>=.78&&h.x<=.975;}
 vec3 memoryAt(vec2 p,float age){
  p=safe(p);if(age<.5)return TEX(uRing0,p).rgb;
  if(age<1.5)return TEX(uRing1,p).rgb;
@@ -185,5 +190,7 @@ void main(){
  float k=uMode==0?1.:uIntensity;
  // FX Brush: effect passes may be masked by finger-painted alpha (same unit as ink).
  if(uMode!=0&&uInkMix>0.)k*=TEX(uInk,safe(vUV)).a*uInkMix;
- COLOR=vec4(clamp(mix(original,c,k),0.,1.),1.);
+ vec3 outc=clamp(mix(original,c,k),0.,1.);
+ if(uMode!=0){vec3 h=rgb2hsv(outc);if(pinkish(h)&&!pinkish(rgb2hsv(original))){h.x=h.x<.875?.74:.99;outc=hsv2rgb(h);}}
+ COLOR=vec4(outc,1.);
 }`;
