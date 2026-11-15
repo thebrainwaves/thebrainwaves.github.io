@@ -1,9 +1,12 @@
-// Pixel Pusher 1.8.0 studio shell. Original Brainhertz Productions code; on-device only.
+// Pixel Pusher 1.8.1 studio shell. Original Brainhertz Productions code; on-device only.
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,randomizeStack,QualityController,BeatClock,normalizePreset} from '../core.js';
 import {formatParam} from '../effects.js';
 import {Renderer} from '../gpu.js';
 import {Mixer} from '../v18/mixer.js';
 import {createMixerUI} from '../v18/mixer-ui.js';
+import {LinkSession} from '../v18/link.js';
+import {createLinkUI} from '../v18/link-ui.js';
+import {readHash,linkUrl} from '../v18/link-codec.js';
 import {Capture,recordingMime} from '../recorder.js';
 import {decodePhoto,fileKind} from '../photo-source.js';
 import {DrawingLayer} from '../drawing-layer.js';
@@ -24,7 +27,7 @@ import {ClipStore} from '../v17/clips-store.js';
 import {Generator} from './generator.js';
 import {createMapUI} from '../v17/map-ui.js';
 
-export const VERSION='1.8.0';
+export const VERSION='1.8.1';
 const $=id=>document.getElementById(id);
 const DEFS=new Map(EFFECTS.map(e=>[e.id,e]));
 const SESSION_KEY='brainhertz.pixelpusher.session.v16',LOOKS_KEY='brainhertz.pixelpusher.looks.v16';
@@ -327,7 +330,7 @@ function tile({label,iconName,thumb,on,selected,action,color,onTap,aria,badge,mo
 function renderStrip(){
  syncGenEdit();
  const strip=$('strip'),keep=strip.scrollLeft;strip.replaceChildren();
- ({perform:stripPerform,source:stripSource,effects:stripEffects,draw:stripDraw,frames:stripFrames,looks:stripLooks,motion:stripMotion,audio:s=>mxUI().strip(s),map:s=>mapUI?.strip(s)})[tab](strip);
+ ({perform:stripPerform,source:stripSource,effects:stripEffects,draw:stripDraw,frames:stripFrames,looks:stripLooks,motion:stripMotion,audio:s=>{mxUI().strip(s);stripLink(s);},map:s=>mapUI?.strip(s)})[tab](strip);
  strip.scrollLeft=keep;
 }
 function refreshUI(){renderStrip();if(drawerOpen)renderDrawer();}
@@ -346,7 +349,7 @@ function openDrawer(mode){drawerMode=mode;drawerOpen=true;pushLayer('drawer',()=
 function closeDrawer(rerender=true){dropLayer('drawer');$('drawer').dataset.mode='';liveSliders.length=0;lfoScopes.length=0;drawerOpen=false;drawerMode=null;$('drawer').hidden=true;$('drawer').replaceChildren();syncGenEdit();requestAnimationFrame(fitCanvas);if(rerender)renderStrip();}
 function renderDrawer(){
  const d=$('drawer'),keep=d.dataset.mode===drawerMode+'|'+selectedFx&&!d.hidden?d.scrollTop:0;d.replaceChildren();d.hidden=false;d.dataset.mode=drawerMode+'|'+selectedFx;liveSliders.length=0;lfoScopes.length=0;
- const builders={mixer:d=>mxUI().drawer(d),map:d=>mapUI.drawer(d,'map'),venues:d=>mapUI.drawer(d,'venues'),keys:drawerKeys,beat:drawerBeat,timeline:drawerTimeline,clips:drawerClips,clip:drawerClip,lfo:drawerLfo,genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
+ const builders={mixer:d=>mxUI().drawer(d),link:d=>lkUI().drawer(d),map:d=>mapUI.drawer(d,'map'),venues:d=>mapUI.drawer(d,'venues'),keys:drawerKeys,beat:drawerBeat,timeline:drawerTimeline,clips:drawerClips,clip:drawerClip,lfo:drawerLfo,genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
  (builders[drawerMode]||(()=>closeDrawer()))(d);if(keep)d.scrollTop=keep;requestAnimationFrame(fitCanvas);
 }
 function head(d,title,tag,extra=[]){const h=el('div','d-head'),t=el('div','d-title');t.append(el('b',null,title));if(tag)t.append(el('small',null,tag));const close=el('button','tb-btn icon');close.type='button';close.setAttribute('aria-label','Close controls');close.append(icon('close'));close.addEventListener('click',()=>closeDrawer());h.append(t,...extra,close);d.append(h);return h;}
@@ -721,6 +724,18 @@ function stripSource(strip){
 // ---------- 1.8 Audio mixer ----------
 let mixUI=null,mixRedraw=0;
 function mxUI(){return mixUI||(mixUI=createMixerUI({mixer:audio,el,icon,tile,chip,button,slider,head,note,drawerIs:m=>drawerOpen&&drawerMode===m,openDrawer,closeDrawer:()=>closeDrawer(),refresh:()=>refreshUI()}));}
+const link=new LinkSession(audio);let linkUI=null;
+function lkUI(){return linkUI||(linkUI=createLinkUI({link,mixer:audio,el,icon,button,chip,head,note,linkUrl,width:()=>$('drawer').clientWidth||330,refresh:()=>{if(drawerOpen&&drawerMode==='link')renderDrawer();}}));}
+const LINK_BADGE={idle:'',preparing:'…',hosting:'QR',approve:'?',connecting:'…',waiting:'QR',connected:'ON',reconnecting:'!',lost:'!'};
+function stripLink(s){s.append(el('span','divider'));s.append(tile({label:link.active?'Linked':'Link',iconName:'link',action:true,color:link.active?'green':'blue',badge:LINK_BADGE[link.state]||undefined,selected:drawerOpen&&drawerMode==='link',aria:'Wi-Fi link',onTap:()=>drawerOpen&&drawerMode==='link'?closeDrawer():openDrawer('link')}));}
+function bindLink(){
+ link.on((state,kind)=>{if(kind==='stats'){linkUI?.updateStats();return;}if(drawerOpen&&drawerMode==='link')renderDrawer();if(tab==='audio')renderStrip();$('link-badge').hidden=!link.active;$('link-badge').classList.toggle('warn',link.state==='reconnecting');});
+ $('link-badge').addEventListener('click',()=>{if(tab!=='audio')setTab('audio');openDrawer('link');});
+ document.addEventListener('visibilitychange',()=>link.pause(document.hidden));addEventListener('pagehide',()=>link.disconnect());
+ // QR links open the app with the code in the URL fragment (never sent to a server). Read it once and wipe it from the address bar.
+ const p=readHash(location.hash);if(!p)return;try{window.history.replaceState(null,'',location.pathname+location.search);}catch{}
+ setTab('audio');openDrawer('link');if(p.startsWith('o.')){link.pendingOffer=p;renderDrawer();}else lkUI().handoffFromUrl(p);
+}
 function syncOnAir(){const b=$('onair');if(b)b.hidden=!audio.armed;document.body.classList.toggle('on-air',audio.armed);}
 function bindMixer(saved){
  audio.bpm=()=>beatClock.bpm;audio.load(saved?.mixer);audioMode=audio.mode;syncOnAir();
@@ -1007,7 +1022,7 @@ async function boot(){
  new ResizeObserver(()=>fitCanvas()).observe($('stage'));
  {let st=0;$('strip').addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(()=>{if(tab==='effects')updateThumbs();},160);},{passive:true});}
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&capture?.active)capture.stop('app hidden');if(document.hidden&&rendering?.stop){rendering.started=false;rendering.stop();}});
- bindStage();nativeFeel();bindTransport();bindReview();bindMixer(saved);
+ bindStage();nativeFeel();bindTransport();bindReview();bindMixer(saved);bindLink();
  performer=new FingerPerformer(canvas,$('touch-overlay'),{enabled:()=>tab==='perform',getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();if(drawerOpen&&drawerMode==='perform')renderDrawer();updateThumbs();}},status:t=>{if(t)hud(t);else hud(null);},onGrab:grabKeys});
  const performerOptions=enabled=>({enabled,getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();updateThumbs();}},status:()=>{},onGrab:grabKeys});
  mapUI=createMapUI({pushLayer,dropLayer,el,icon,tile,chip,button,label,slider,head,note,store,safe,saveBlob,openSheet,closeSheet,Generator,GEN_SOURCES,defaultGen,textSpec,speedFactor,FingerPerformer,performerOptions,mainCanvas:canvas,
@@ -1016,6 +1031,6 @@ async function boot(){
  ensureSize();fitCanvas();renderStrip();requestAnimationFrame(loop);setTimeout(()=>updateThumbs(),200);
  try{if(!store.getItem('brainhertz.pixelpusher.tip16')){store.setItem('brainhertz.pixelpusher.tip16','1');hud('Hold preview = original  ·  drag = tweak effect');setTimeout(()=>hud(null),3800);}}catch{}
  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).catch(()=>{});
- globalThis.__pp={nav,mixer:audio,get mixUI(){return mixUI;},get map(){return mapUI?.api;},get renderer(){return renderer;},perf,rebuildRenderer,get blackRun(){return blackRun;},get tl(){return tl;},beatData,clips,get clipList(){return clipList;},refreshClips,openReview,closeReview,get review(){return review;},renderRange,makeClip,useClip,seek,setPlaying,get rendering(){return rendering;},analyzeMedia,get stack(){return stack;},get lfos(){return lfos;},drawOwner,fxbOwner,get signals(){return signals;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
+ globalThis.__pp={nav,mixer:audio,link,get mixUI(){return mixUI;},get map(){return mapUI?.api;},get renderer(){return renderer;},perf,rebuildRenderer,get blackRun(){return blackRun;},get tl(){return tl;},beatData,clips,get clipList(){return clipList;},refreshClips,openReview,closeReview,get review(){return review;},renderRange,makeClip,useClip,seek,setPlaying,get rendering(){return rendering;},analyzeMedia,get stack(){return stack;},get lfos(){return lfos;},drawOwner,fxbOwner,get signals(){return signals;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
 }
 boot();

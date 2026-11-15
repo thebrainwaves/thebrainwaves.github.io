@@ -2,7 +2,8 @@
 // Input (mic / audio interface) only after an explicit tap, never in the background, never heard unless "Hear input" is on.
 // The limited master feeds the analyser (Motion audio + live KICK/HITS) and a MediaStream for recording. Speakers get a monitor
 // mix: video + app sounds, plus the input only when "Hear input" is on (headphones; avoids feedback).
-export const CHANNELS=[['input','Input'],['video','Video audio'],['app','App sounds']];
+export const CHANNELS=[['input','Input'],['video','Video audio'],['app','App sounds'],['link','Link']];
+export const SEND_SOURCES=[['off','Off'],['master','Mix'],['input','Input'],['video','Video'],['app','App']];
 export const GAIN_MAX=2;           // +6 dB
 export const CEILING=0.966;        // -0.3 dBFS brickwall
 export const DB_FLOOR=-90;
@@ -12,7 +13,7 @@ export const fromDb=db=>db<=DB_FLOOR?0:10**(db/20);
 export const fmtGain=g=>g<=0.0005?'−∞ dB':((v)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1)+' dB')(toDb(g));
 export const fmtPan=p=>Math.abs(p)<.02?'C':(p<0?'L ':'R ')+Math.round(Math.abs(p)*100);
 const defCh=(gain,mute)=>({gain,mute,solo:false,pan:0});
-export function defaultMix(){return {v:1,master:{gain:1},ch:{input:{...defCh(1,false),monitor:false,device:''},video:defCh(1,true),app:defCh(.5,true)},app:{tone:false,click:false},sink:''};}
+export function defaultMix(){return {v:1,master:{gain:1},ch:{input:{...defCh(1,false),monitor:false,device:''},video:defCh(1,true),app:defCh(.5,true),link:defCh(1,false)},app:{tone:false,click:false},sink:''};}
 export function normalizeMix(raw){
  const d=defaultMix();if(!raw||typeof raw!=='object')return d;
  d.master.gain=clamp(raw.master?.gain,0,GAIN_MAX,1);
@@ -24,13 +25,13 @@ export function normalizeMix(raw){
  return d;
 }
 // Linear gain each channel contributes to the master after mute / solo / on-air. Solo wins over mute on other channels.
-export function effectiveGains(mix,armed){
+export function effectiveGains(mix,armed,linkOn=false){
  const anySolo=CHANNELS.some(([id])=>mix.ch[id].solo),out={};
- for(const [id] of CHANNELS){const c=mix.ch[id];let g=c.mute?0:c.gain;if(anySolo&&!c.solo)g=0;if(id==='input'&&!armed)g=0;out[id]=g;}
+ for(const [id] of CHANNELS){const c=mix.ch[id];let g=c.mute?0:c.gain;if(anySolo&&!c.solo)g=0;if(id==='input'&&!armed)g=0;if(id==='link'&&!linkOn)g=0;out[id]=g;}
  return out;
 }
 // Studio-wide audio mode, derived from what is actually audible in the mix (keeps 1.7 Motion / Beat logic working).
-export function modeOf(mix,armed){const g=effectiveGains(mix,armed),mic=g.input>0,other=g.video>0||(g.app>0&&(mix.app.tone||mix.app.click));return mic&&other?'mix':mic?'mic':other?'video':'none';}
+export function modeOf(mix,armed,linkOn=false){const g=effectiveGains(mix,armed,linkOn),mic=g.input>0,other=g.video>0||g.link>0||(g.app>0&&(mix.app.tone||mix.app.click));return mic&&other?'mix':mic?'mic':other?'video':'none';}
 // Peak + RMS of a time-domain block (linear 0..1+).
 export function measure(buf){let peak=0,sum=0;for(let i=0;i<buf.length;i++){const v=buf[i],a=v<0?-v:v;if(a>peak)peak=a;sum+=v*v;}return {peak,rms:buf.length?Math.sqrt(sum/buf.length):0};}
 // Meter ballistics in dB: instant attack, peak falls 24 dB/s, peak-hold 1.2 s.
@@ -43,7 +44,7 @@ export const sinkSupported=()=>{const A=globalThis.AudioContext;return !!(A&&'se
 export class Mixer{
  constructor(video){this.video=video;this.mix=defaultMix();this.armed=false;this.mic=null;this.mode='none';this.bandLevels={low:0,mid:0,high:0};this.listeners=new Set();this.meter={};this.lastMeter=0;this.notice='';this.clickNext=0;}
  on(fn){this.listeners.add(fn);return ()=>this.listeners.delete(fn);}
- emit(why){this.mode=modeOf(this.mix,this.armed);for(const f of this.listeners){try{f(why);}catch(e){console.warn(e);}}}
+ emit(why){this.mode=modeOf(this.mix,this.armed,this.linkOn);for(const f of this.listeners){try{f(why);}catch(e){console.warn(e);}}}
  get state(){return this.ctx?this.ctx.state:'off';}
  load(raw){this.mix=normalizeMix(raw);this.mix.app.tone=this.mix.app.click=false; // never start a tone or click by surprise after reload
   this.apply();this.emit('load');}
@@ -77,12 +78,12 @@ export class Mixer{
  // iOS: an AudioContext only starts inside a tap. Called from a global pointerdown; also resumes after interruptions (calls, Siri, other apps).
  unlock(){if(!this.ctx){if(modeOf(this.mix,false)!=='none'&&!document.hidden)this.ensure().then(()=>this.emit('state')).catch(()=>{});return;}if(this.ctx&&this.ctx.state!=='running'&&this.ctx.state!=='closed'&&!document.hidden)this.ctx.resume().then(()=>this.emit('state')).catch(()=>{});}
  apply(){
-  const m=this.mix,g=effectiveGains(m,this.armed);
+  const m=this.mix,g=effectiveGains(m,this.armed,this.linkOn);
   if(this.video)this.video.muted=!this.ctx||!(g.video>0);
   if(!this.ctx)return;const t=this.ctx.currentTime,set=(p,v)=>{try{p.setTargetAtTime(v,t,.015);}catch{p.value=v;}};
-  set(this.masterIn.gain,m.master.gain);set(this.monBus.gain,m.master.gain);
+  set(this.masterIn.gain,m.master.gain);set(this.monBus.gain,m.master.gain);if(this.sendSum)set(this.sendSum.gain,m.master.gain);
   for(const [id] of CHANNELS){const n=this.nodes[id],c=m.ch[id];set(n.fader.gain,c.gain);if(n.pan)set(n.pan.pan,c.pan);
-   const open=c.mute||(CHANNELS.some(([k])=>m.ch[k].solo)&&!c.solo)||(id==='input'&&!this.armed)?0:1;set(n.gate.gain,open);
+   const open=c.mute||(CHANNELS.some(([k])=>m.ch[k].solo)&&!c.solo)||(id==='input'&&!this.armed)||(id==='link'&&!this.linkOn)?0:1;set(n.gate.gain,open);
    set(n.mon.gain,id==='input'?(c.monitor?1:0):1);}
   this.syncApp();
  }
@@ -121,8 +122,9 @@ export class Mixer{
  // ---- Meters + analysis (same API as the 1.5 AudioEngine) ----
  readMeter(an){if(an.getFloatTimeDomainData){an.getFloatTimeDomainData(this.buf);return measure(this.buf);}const b=new Uint8Array(an.fftSize);an.getByteTimeDomainData(b);const f=new Float32Array(b.length);for(let i=0;i<b.length;i++)f[i]=(b[i]-128)/128;return measure(f);}
  meters(now=performance.now()){const dt=Math.min(.1,Math.max(0,(now-(this.lastMeter||now))/1000));this.lastMeter=now;const out=this.meter;
-  if(!this.ctx||this.ctx.state!=='running'){for(const id of ['input','video','app','master'])out[id]=ballistics(out[id]||{},{peak:0,rms:0},dt);out.gr=0;return out;}
+  if(!this.ctx||this.ctx.state!=='running'){for(const id of ['input','video','app','link','master','send'])out[id]=ballistics(out[id]||{},{peak:0,rms:0},dt);out.gr=0;return out;}
   for(const [id] of CHANNELS)out[id]=ballistics(out[id]||{},this.readMeter(this.nodes[id].meter),dt);
+  out.send=ballistics(out.send||{},this.sendMeter&&this.sendId&&this.sendId!=='off'?this.readMeter(this.sendMeter):{peak:0,rms:0},dt);
   out.master=ballistics(out.master||{},this.readMeter(this.masterMeter),dt);out.gr=typeof this.limiter.reduction==='number'?this.limiter.reduction:this.limiter.reduction?.value||0;return out;}
  level(sensitivity=1.5){if(!this.analyser||this.ctx.state!=='running'||this.mode==='none')return 0;this.analyser.getByteFrequencyData(this.data);let sum=0;for(let i=1;i<64;i++)sum+=this.data[i];return Math.min(1,sum/(63*255)*sensitivity);}
  bands(sensitivity=1.5){const out=this.bandLevels;if(!this.analyser||this.ctx.state!=='running'||this.mode==='none'){out.low=out.mid=out.high=0;return out;}const hz=this.ctx.sampleRate/this.analyser.fftSize;for(const [name,lo,hi]of [['low',30,250],['mid',250,2500],['high',2500,12000]]){let total=0,count=0;for(let i=Math.max(1,Math.ceil(lo/hz));i<Math.min(this.data.length,Math.ceil(hi/hz));i++){total+=this.data[i];count++;}out[name]=Math.min(1,total/Math.max(1,count)/255*sensitivity);}return out;}
@@ -136,4 +138,19 @@ export class Mixer{
   this.apply();this.emit('mode');
  }
  monitorClip(on){this.set('ch.video.mute',!on);}
+ // ---- 1.8.1 Link: receive a remote WebRTC stream as the Link channel; send the mix or one channel ----
+ // "Mix" for the link is Input + Video + App only (never the Link channel), so two linked devices can't loop.
+ sendTrack(id){if(!this.ctx||id==='off'||!id)return null;const c=this.ctx;this.sendDests||(this.sendDests={});
+  if(!this.sendMeter){this.sendMeter=c.createAnalyser();this.sendMeter.fftSize=1024;}
+  if(!this.sendDests[id]){const d=c.createMediaStreamDestination();
+   if(id==='master'){if(!this.sendSum){this.sendSum=c.createGain();this.sendSum.gain.value=this.mix.master.gain;const lim=c.createDynamicsCompressor();lim.threshold.value=-6;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.001;lim.release.value=.08;this.sendSum.connect(lim);this.sendLim=lim;for(const k of ['input','video','app'])this.nodes[k].gate.connect(this.sendSum);}this.sendLim.connect(d);}
+   else if(this.nodes[id]&&id!=='link')this.nodes[id].gate.connect(d);else return null;this.sendDests[id]=d;}
+  const src=id==='master'?this.sendLim:this.nodes[id].gate;try{this.sendSrc?.disconnect(this.sendMeter);}catch{}src.connect(this.sendMeter);this.sendSrc=src;this.sendId=id;
+  return this.sendDests[id].stream.getAudioTracks()[0]||null;}
+ stopSend(){try{this.sendSrc?.disconnect(this.sendMeter);}catch{}this.sendSrc=null;this.sendId='off';}
+ async attachLink(stream){await this.ensure();this.detachLink(false);
+  // Chrome only feeds a remote WebRTC track into Web Audio while a (muted) media element also plays it.
+  const a=this.linkEl||(this.linkEl=document.createElement('audio'));a.muted=true;a.srcObject=stream;a.play?.().catch(()=>{});
+  this.linkNode=this.ctx.createMediaStreamSource(stream);this.linkNode.connect(this.nodes.link.in);this.linkOn=true;this.apply();this.emit('link');}
+ detachLink(emit=true){try{this.linkNode?.disconnect();}catch{}this.linkNode=null;if(this.linkEl){this.linkEl.srcObject=null;}const was=this.linkOn;this.linkOn=false;this.apply();if(emit&&was)this.emit('link');}
 }

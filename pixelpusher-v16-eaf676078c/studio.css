@@ -300,3 +300,21 @@ body.on-air .mx-ch.input{border-color:var(--red);box-shadow:0 0 16px rgba(255,43
 .mx-select{width:100%;min-height:44px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);color:var(--text);font-size:15px;padding:0 10px}
 .mx-route{margin-top:10px;border:1px dashed var(--line2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px}
 .mx-paused{color:#ff3b4b;font-size:12px;margin:4px 0}
+/* 1.8.1 Link */
+.link-badge{position:absolute;left:12px;top:60px;z-index:4;min-height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--green);background:rgba(4,30,18,.92);color:var(--green);font-weight:800;letter-spacing:.14em;font-size:11px}
+.link-badge.warn{border-color:var(--red);color:#ff3b4b;background:rgba(40,8,6,.92)}
+body:not(.on-air) .link-badge{top:12px}
+.lk-body{display:flex;flex-direction:column;gap:10px}
+.lk-body b{font-size:13px;letter-spacing:.06em}
+.lk-step{font-size:13px;font-weight:700;color:var(--text);margin:4px 0 0}
+.lk-big{font-size:17px;font-weight:700;margin:4px 0}
+.lk-qr{display:flex;justify-content:center;padding:8px;background:#fff;border-radius:12px;align-self:center;max-width:100%}
+.lk-qr canvas{display:block;max-width:100%;height:auto;image-rendering:pixelated}
+.lk-code{font:800 34px/1.1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-align:center;color:var(--green);padding:10px;border:1px solid rgba(39,232,137,.5);border-radius:12px;background:#06140e}
+.lk-main{flex:1;min-height:50px}
+.lk-ok{border-color:var(--green);color:var(--green);background:#06140e}.lk-no{border-color:var(--red);color:#ff3b4b;background:#260b06}
+.lk-paste{display:flex;flex-wrap:wrap;gap:8px}.lk-text{flex:1 1 100%;min-height:52px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);color:var(--text);font:13px/1.3 ui-monospace,Menlo,monospace;padding:8px;resize:vertical;-webkit-user-select:text;user-select:text}
+.lk-status{font-weight:700;color:var(--green);margin:2px 0}.lk-status.warn{color:#ff3b4b}
+.lk-src .chip{min-height:44px;min-width:56px;justify-content:center}
+.lk-meter{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px}
+.lk-err{margin:0}

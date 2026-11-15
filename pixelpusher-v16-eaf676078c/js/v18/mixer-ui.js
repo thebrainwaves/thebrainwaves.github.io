@@ -55,7 +55,7 @@ export function createMixerUI(x){
  function drawer(d){meters=[];
   head(d,'Audio mixer','INPUT · VIDEO · APP → MASTER');
   const st=mixer.state;if(st!=='running'&&st!=='off')d.append(el('p','mx-paused','Audio is paused by the system. Tap anywhere to resume.'));
-  const grid=el('div','mx-grid');for(const [id,label]of CHANNELS)chStrip(grid,id,label);
+  const grid=el('div','mx-grid');for(const [id,label]of CHANNELS){if(id==='link'&&!mixer.linkOn)continue;chStrip(grid,id,label);}
   const ms=el('section','mx-ch master');const top=el('div','mx-top');top.append(el('b',null,'Master'));grEl=el('span','mx-gr','LIMIT 0.0 dB');top.append(grEl);ms.append(top);
   ms.append(el('small','mx-sub','Brickwall limiter, −0.3 dB ceiling. Feeds KICK/HITS, Motion audio and Make clip / REC.'));
   ms.append(meter('master','Master'));
