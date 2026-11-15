@@ -1,4 +1,4 @@
-// Pixel Pusher 1.8.3 studio shell. Original Brainhertz Productions code; on-device only.
+// Pixel Pusher 1.8.4 studio shell. Original Brainhertz Productions code; on-device only.
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,randomizeStack,QualityController,BeatClock,normalizePreset} from '../core.js';
 import {formatParam} from '../effects.js';
 import {Renderer} from '../gpu.js';
@@ -27,7 +27,7 @@ import {ClipStore} from '../v17/clips-store.js';
 import {Generator} from './generator.js';
 import {createMapUI} from '../v17/map-ui.js';
 
-export const VERSION='1.8.3';
+export const VERSION='1.8.4';
 const $=id=>document.getElementById(id);
 const DEFS=new Map(EFFECTS.map(e=>[e.id,e]));
 const SESSION_KEY='brainhertz.pixelpusher.session.v16',LOOKS_KEY='brainhertz.pixelpusher.looks.v16';

@@ -1,5 +1,5 @@
 // Versioned app-shell cache only. Never caches user media or remote requests.
-const CACHE='pixelpusher-v1.8.3';
+const CACHE='pixelpusher-v1.8.4';
 // Remove only old app-shell caches, including the pre-rename namespace. No media was cached.
 const ASSETS=['./','./index.html','./studio.css','./manifest.webmanifest','./js/v16/studio.js','./js/v18/mixer.js','./js/v18/mixer-ui.js','./js/v18/link.js','./js/v18/link-ui.js','./js/v18/link-codec.js','./js/v18/qr.js','./js/v16/history.js','./js/v16/modulation.js','./js/v16/frames-store.js','./js/v16/zip.js','./js/v16/share.js','./js/v16/fx-presets.js','./js/v16/fx-paint.js','./js/v16/gen-sources.js','./js/v16/generator.js','./js/v16/perform.js','./js/v17/map.js','./js/v17/map-gl.js','./js/v17/map-ui.js','./js/v17/export-hooks.js','./js/v17/timeline.js','./js/v17/beats.js','./js/v17/clips-store.js','./js/v17/bloom.js','./js/touch.js','./js/core.js','./js/effects.js','./js/console-state.js','./js/effect-catalog.js','./js/shader-state.js','./js/gpu.js','./js/shaders.js','./js/audio.js','./js/recorder.js','./js/photo-source.js','./js/drawing-state.js','./js/drawing-layer.js','./js/storage.js','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));});

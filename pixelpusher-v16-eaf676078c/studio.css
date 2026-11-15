@@ -111,8 +111,8 @@ input[type=color]{width:52px;height:42px;border:1px solid var(--line2);border-ra
 @media (max-width:430px){.brand{margin-left:4px}#btn-save{padding:0 10px}.tb-group{gap:4px}}
 @media (max-width:360px){.tb-btn span{display:none}.tb-btn{padding:0;width:44px}}
 @media (min-width:700px){:root{--tile:84px}.drawer{max-height:34vh}.tab{font-size:12px}}
-/* Landscape: preview left, controls right */
-@media (orientation:landscape) and (min-aspect-ratio:4/3){
+/* Landscape on tablet-height screens: preview left, controls right. Phones (<=500 px tall) keep the portrait stack (1.8.4). */
+@media (orientation:landscape) and (min-aspect-ratio:4/3) and (min-height:501px){
  .app{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,36vw,420px);grid-template-rows:auto auto auto minmax(0,1fr) auto;grid-template-areas:"top top" "stage tabs" "stage strip" "stage drawer" "timeline drawer"}
  .topbar{grid-area:top}.stage{grid-area:stage;min-height:0}.tabs{grid-area:tabs}.strip-wrap{grid-area:strip;min-width:0}.drawer{grid-area:drawer;max-height:none;align-self:start;max-height:100%}.timeline{grid-area:timeline}
 }
@@ -319,3 +319,17 @@ body:not(.on-air) .link-badge{top:12px}
 .lk-src .chip{min-height:44px;min-width:56px;justify-content:center}
 .lk-meter{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px}
 .lk-err{margin:0}
+/* ---------- 1.8.4 phone landscape: the same stacked layout and menu as portrait (no side panel); the preview gets the width ---------- */
+@media (orientation:landscape) and (max-height:500px){
+ :root{--tile:42px}
+ .app{gap:4px;padding:calc(var(--safe-t) + 4px) calc(var(--safe-r) + 6px) calc(var(--safe-b) + 4px) calc(var(--safe-l) + 6px)}
+ .topbar{min-height:42px;padding-top:2px;padding-bottom:2px}.tb-btn{min-height:40px}
+ .stage{min-height:0;padding:3px}
+ .timeline{padding:3px 6px 4px;gap:3px}.tl-head .vt-btn{width:40px;height:40px}.tl-canvas{height:30px}
+ .strip-wrap{padding:4px 0}.tile{width:64px;gap:2px;font-size:10px}.tile .thumb{width:64px;height:var(--tile)}
+ .tab{min-height:42px;flex-direction:row;gap:5px}.tab svg{width:18px;height:18px;flex:none}
+ .tab span{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .drawer{max-height:34vh;padding-top:10px}
+ /* an open drawer (mixer, settings) borrows the timeline's height so it stays usable at 375-390 px tall */
+ .app:has(> .drawer:not([hidden])) .timeline{display:none}
+}
