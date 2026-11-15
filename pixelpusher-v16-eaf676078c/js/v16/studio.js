@@ -1,8 +1,9 @@
-// Pixel Pusher 1.7.3 studio shell. Original Brainhertz Productions code; on-device only.
+// Pixel Pusher 1.8.0 studio shell. Original Brainhertz Productions code; on-device only.
 import {EFFECTS,PRESETS,defaultStack,sanitizeStack,moveEffect,randomizeStack,QualityController,BeatClock,normalizePreset} from '../core.js';
 import {formatParam} from '../effects.js';
 import {Renderer} from '../gpu.js';
-import {AudioEngine} from '../audio.js';
+import {Mixer} from '../v18/mixer.js';
+import {createMixerUI} from '../v18/mixer-ui.js';
 import {Capture,recordingMime} from '../recorder.js';
 import {decodePhoto,fileKind} from '../photo-source.js';
 import {DrawingLayer} from '../drawing-layer.js';
@@ -23,7 +24,7 @@ import {ClipStore} from '../v17/clips-store.js';
 import {Generator} from './generator.js';
 import {createMapUI} from '../v17/map-ui.js';
 
-export const VERSION='1.7.3';
+export const VERSION='1.8.0';
 const $=id=>document.getElementById(id);
 const DEFS=new Map(EFFECTS.map(e=>[e.id,e]));
 const SESSION_KEY='brainhertz.pixelpusher.session.v16',LOOKS_KEY='brainhertz.pixelpusher.looks.v16';
@@ -33,7 +34,7 @@ const store=(()=>{try{localStorage.setItem('pp.t','1');localStorage.removeItem('
 
 // ---------- State ----------
 const canvas=$('output'),video=$('media'),app=$('app');
-const audio=new AudioEngine(video),beatClock=new BeatClock(),quality=new QualityController();
+const audio=new Mixer(video),beatClock=new BeatClock(),quality=new QualityController();
 const drawing=new DrawingLayer({brush:'pen',size:10,color:'#ff2b3d',opacity:1});
 const frames=new FrameStore(),history=new SnapshotHistory(60);
 let renderer,thumbRenderer=null,stack=[],tab='effects',selectedFx=null,drawerOpen=false,selectedFrame=null,selectedLook=null,drawerMode=null;
@@ -81,7 +82,7 @@ function commit(){if(history.push(snapshot(),signature()))saveSession();syncUndo
 function restore(entry){if(!entry)return;stack=structuredClone(entry.stack);drawing.model.current=null;drawing.model.strokes=entry.strokes.slice();drawing.model.revision++;drawing.baseKey='';fxPaint.set(entry.fxStrokes||[]);if(entry.gen){const before=gen.id;gen=structuredClone(entry.gen);if(!gen.keys)gen.keys=[];if(sourceKind==='gen'&&before!==gen.id)renderer?.clearHistory();}if(entry.lfos)lfos=structuredClone(entry.lfos);if(entry.drawMods)drawOwner.mods=structuredClone(entry.drawMods);if(entry.fxbMods)fxbOwner.mods=structuredClone(entry.fxbMods);renderer?.clearHistory();saveSession();refreshUI();syncUndo();}
 function syncUndo(){$('btn-undo').disabled=!history.canUndo;$('btn-redo').disabled=!history.canRedo;}
 let sessionTimer;
-function saveSession(){clearTimeout(sessionTimer);sessionTimer=setTimeout(()=>{try{store.setItem(SESSION_KEY,JSON.stringify({v:VERSION,stack,drawing:drawing.model.settings,sensitivity,gen,genActive:sourceKind==='gen',lfos,drawMods:drawOwner.mods,fxbMods:fxbOwner.mods,timeline:{duration:tl.duration,in:tl.in,out:tl.out,loop:tl.loop}}));}catch{/* storage full: session continuity only */}},300);}
+function saveSession(){clearTimeout(sessionTimer);sessionTimer=setTimeout(()=>{try{store.setItem(SESSION_KEY,JSON.stringify({v:VERSION,stack,drawing:drawing.model.settings,sensitivity,gen,genActive:sourceKind==='gen',lfos,drawMods:drawOwner.mods,fxbMods:fxbOwner.mods,timeline:{duration:tl.duration,in:tl.in,out:tl.out,loop:tl.loop},mixer:audio.snapshot()}));}catch{/* storage full: session continuity only */}},300);}
 function loadSession(){try{const raw=store.getItem(SESSION_KEY);if(!raw||raw.length>1e6)return null;return JSON.parse(raw);}catch{return null;}}
 function loadLooks(){try{const raw=store.getItem(LOOKS_KEY);const list=raw&&raw.length<4e6?JSON.parse(raw):[];userLooks=(Array.isArray(list)?list:[]).slice(0,60).map(v=>{const p=normalizePreset(v);const g=v&&v.gen?normGen(v.gen):null;return p?{name:p.name,stack:withMods(p.stack,v.stack),...(g?{gen:g}:{}),...(Array.isArray(v.lfos)?{lfos:normalizeLfos(v.lfos)}:{})}:null;}).filter(Boolean);}catch{userLooks=[];}
  try{legacyLooks=readPresets(store).presets.map(p=>({name:p.name,stack:p.stack,legacy:true}));}catch{legacyLooks=[];}}
@@ -203,7 +204,7 @@ const useFile=safe(async file=>{setTimeout(()=>tab==='source'&&renderStrip(),900
 });
 // Video file or saved clip onto the timeline. MediaRecorder WebM has no duration header, so it is probed once.
 async function loadVideo(blob,clip){
- releaseSource();tlTouched=false;tl.in=0;sourceURL=URL.createObjectURL(blob);video.src=sourceURL;video.loop=tl.loop;video.muted=!(audioMode==='video'||audioMode==='mix');
+ releaseSource();tlTouched=false;tl.in=0;sourceURL=URL.createObjectURL(blob);video.src=sourceURL;video.loop=tl.loop;audio.apply();
  await new Promise((ok,bad)=>{video.onloadeddata=ok;video.onerror=()=>bad(new Error('This video could not be opened on this device.'));});
  if(!Number.isFinite(video.duration)){await new Promise(ok=>{const fin=()=>{video.removeEventListener('durationchange',fin);ok();};video.addEventListener('durationchange',fin);try{video.currentTime=1e7;}catch{ok();}setTimeout(fin,1500);});try{video.currentTime=0;}catch{}}
  clipSource=clip?{id:clip.id,name:clip.name,duration:clip.duration}:null;mediaBlob=blob;
@@ -318,7 +319,7 @@ async function analyzeMedia(blob){resetBeats();if(!blob)return;const token=beatD
  if(drawerOpen&&drawerMode==='beat')renderDrawer();}
 
 // ---------- UI: tabs, strip, drawer ----------
-function setTab(next){if(next!=='source')genGrid=false;if(next!==tab&&tab!=='map')prevTab=tab;tab=next;app.dataset.tab=tab;updatePill();if(tab==='perform')hudFlash('Finger FX: drag 1–2 fingers · pinch · twist · hold = freeze · tap = stutter');for(const b of document.querySelectorAll('.tab'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));closeDrawer(false);renderStrip();if(tab==='effects')setTimeout(()=>updateThumbs(),30);if(tab==='frames')refreshFrames();if(tab==='motion')openDrawer('lfo');if(tab==='map'){pushLayer('map',()=>setTab(prevTab==='map'?'effects':prevTab));mapUI?.enter();}else{dropLayer('map');mapUI?.leave();}}
+function setTab(next){if(next!=='source')genGrid=false;if(next!==tab&&tab!=='map')prevTab=tab;tab=next;app.dataset.tab=tab;updatePill();if(tab==='perform')hudFlash('Finger FX: drag 1–2 fingers · pinch · twist · hold = freeze · tap = stutter');for(const b of document.querySelectorAll('.tab'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));closeDrawer(false);renderStrip();if(tab==='effects')setTimeout(()=>updateThumbs(),30);if(tab==='frames')refreshFrames();if(tab==='motion')openDrawer('lfo');if(tab==='audio')openDrawer('mixer');if(tab==='map'){pushLayer('map',()=>setTab(prevTab==='map'?'effects':prevTab));mapUI?.enter();}else{dropLayer('map');mapUI?.leave();}}
 function tile({label,iconName,thumb,on,selected,action,color,onTap,aria,badge,mods}){
  const b=el('button','tile'+(on?' on':'')+(selected?' selected':'')+(action?' action':'')+(color?' '+color:''));b.type='button';b.setAttribute('aria-label',aria||label);if(on!==undefined)b.setAttribute('aria-pressed',String(!!on));
  const t=el('div','thumb');if(thumb)t.append(thumb);else if(iconName)t.append(icon(iconName));if(badge)t.append(el('span','badge',badge));if(mods)t.append(el('span','mods-dot'));b.append(t,el('span','label',label));b.addEventListener('click',onTap);return b;
@@ -326,7 +327,7 @@ function tile({label,iconName,thumb,on,selected,action,color,onTap,aria,badge,mo
 function renderStrip(){
  syncGenEdit();
  const strip=$('strip'),keep=strip.scrollLeft;strip.replaceChildren();
- ({perform:stripPerform,source:stripSource,effects:stripEffects,draw:stripDraw,frames:stripFrames,looks:stripLooks,motion:stripMotion,map:s=>mapUI?.strip(s)})[tab](strip);
+ ({perform:stripPerform,source:stripSource,effects:stripEffects,draw:stripDraw,frames:stripFrames,looks:stripLooks,motion:stripMotion,audio:s=>mxUI().strip(s),map:s=>mapUI?.strip(s)})[tab](strip);
  strip.scrollLeft=keep;
 }
 function refreshUI(){renderStrip();if(drawerOpen)renderDrawer();}
@@ -345,7 +346,7 @@ function openDrawer(mode){drawerMode=mode;drawerOpen=true;pushLayer('drawer',()=
 function closeDrawer(rerender=true){dropLayer('drawer');$('drawer').dataset.mode='';liveSliders.length=0;lfoScopes.length=0;drawerOpen=false;drawerMode=null;$('drawer').hidden=true;$('drawer').replaceChildren();syncGenEdit();requestAnimationFrame(fitCanvas);if(rerender)renderStrip();}
 function renderDrawer(){
  const d=$('drawer'),keep=d.dataset.mode===drawerMode+'|'+selectedFx&&!d.hidden?d.scrollTop:0;d.replaceChildren();d.hidden=false;d.dataset.mode=drawerMode+'|'+selectedFx;liveSliders.length=0;lfoScopes.length=0;
- const builders={map:d=>mapUI.drawer(d,'map'),venues:d=>mapUI.drawer(d,'venues'),keys:drawerKeys,beat:drawerBeat,timeline:drawerTimeline,clips:drawerClips,clip:drawerClip,lfo:drawerLfo,genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
+ const builders={mixer:d=>mxUI().drawer(d),map:d=>mapUI.drawer(d,'map'),venues:d=>mapUI.drawer(d,'venues'),keys:drawerKeys,beat:drawerBeat,timeline:drawerTimeline,clips:drawerClips,clip:drawerClip,lfo:drawerLfo,genlib:drawerGenLib,gen:drawerGen,perform:drawerPerform,fxbrush:drawerFxBrush,fx:drawerFx,brush:drawerBrush,frame:drawerFrame,anim:drawerAnim,look:drawerLook,motion:drawerMotion};
  (builders[drawerMode]||(()=>closeDrawer()))(d);if(keep)d.scrollTop=keep;requestAnimationFrame(fitCanvas);
 }
 function head(d,title,tag,extra=[]){const h=el('div','d-head'),t=el('div','d-title');t.append(el('b',null,title));if(tag)t.append(el('small',null,tag));const close=el('button','tb-btn icon');close.type='button';close.setAttribute('aria-label','Close controls');close.append(icon('close'));close.addEventListener('click',()=>closeDrawer());h.append(t,...extra,close);d.append(h);return h;}
@@ -717,8 +718,24 @@ function stripSource(strip){
  strip.append(tile({label:'Last frame',iconName:'frame',action:true,aria:'Use last captured frame as source',onTap:()=>{const f=frameList.at(-1);if(!f)return note('Capture a frame first (Frames tab).');useBlob(f.blob).then(()=>renderStrip());}}));
 }
 
+// ---------- 1.8 Audio mixer ----------
+let mixUI=null,mixRedraw=0;
+function mxUI(){return mixUI||(mixUI=createMixerUI({mixer:audio,el,icon,tile,chip,button,slider,head,note,drawerIs:m=>drawerOpen&&drawerMode===m,openDrawer,closeDrawer:()=>closeDrawer(),refresh:()=>refreshUI()}));}
+function syncOnAir(){const b=$('onair');if(b)b.hidden=!audio.armed;document.body.classList.toggle('on-air',audio.armed);}
+function bindMixer(saved){
+ audio.bpm=()=>beatClock.bpm;audio.load(saved?.mixer);audioMode=audio.mode;syncOnAir();
+ audio.on(why=>{audioMode=audio.mode;syncOnAir();if(why!=='state'&&why!=='load')saveSession();
+  if(why==='state'&&audio.ctx&&audio.ctx.state!=='running'&&audio.ctx.state!=='closed'&&!document.hidden&&audio.mode!=='none')note('Audio paused by the system. Tap anywhere to resume.');
+  if(why==='ended')note(audio.notice,true);
+  if(mixRedraw)return;mixRedraw=requestAnimationFrame(()=>{mixRedraw=0;if(tab==='audio'||tab==='motion')renderStrip();if(drawerOpen&&drawerMode==='mixer')renderDrawer();});});
+ $('onair').addEventListener('click',()=>{audio.disarm();note('Input off');});
+ // iOS unlock + resume after interruptions: any tap restarts a suspended graph (never while hidden).
+ addEventListener('pointerdown',()=>audio.unlock(),{capture:true,passive:true});
+ const hide=()=>audio.pageHidden();document.addEventListener('visibilitychange',()=>{if(document.hidden)hide();});addEventListener('pagehide',hide);
+}
+
 // Motion
-async function setAudio(mode){try{await audio.configure(mode);audioMode=mode;note(mode==='none'?'Audio off':mode==='mic'?'Mic listening (never recorded unless you record)':mode==='video'?'Clip audio':'Mic + clip');}catch(e){note(e.message||'Audio unavailable.',true);}renderStrip();}
+async function setAudio(mode){try{await audio.configure(mode);audioMode=audio.mode;note(mode==='none'?'Audio off':mode==='mic'?'Mic listening (never recorded unless you record)':mode==='video'?'Clip audio':'Mic + clip');}catch(e){note(e.message||'Audio unavailable.',true);}renderStrip();}
 function stripMotion(strip){
  const links=stack.reduce((n,e)=>n+e.mods.filter(m=>isGlobalLfo(m.source)).length,0)+[gen,drawOwner,fxbOwner].reduce((n,o)=>n+o.mods.filter(m=>isGlobalLfo(m.source)).length,0);
  strip.append(tile({label:'LFOs',iconName:'lfo',action:true,color:'purple',badge:String(links||LFO_COUNT),selected:drawerOpen&&drawerMode==='lfo',aria:'LFO panel',onTap:()=>drawerOpen&&drawerMode==='lfo'?closeDrawer():openDrawer('lfo')}));
@@ -990,7 +1007,7 @@ async function boot(){
  new ResizeObserver(()=>fitCanvas()).observe($('stage'));
  {let st=0;$('strip').addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(()=>{if(tab==='effects')updateThumbs();},160);},{passive:true});}
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&capture?.active)capture.stop('app hidden');if(document.hidden&&rendering?.stop){rendering.started=false;rendering.stop();}});
- bindStage();nativeFeel();bindTransport();bindReview();
+ bindStage();nativeFeel();bindTransport();bindReview();bindMixer(saved);
  performer=new FingerPerformer(canvas,$('touch-overlay'),{enabled:()=>tab==='perform',getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();if(drawerOpen&&drawerMode==='perform')renderDrawer();updateThumbs();}},status:t=>{if(t)hud(t);else hud(null);},onGrab:grabKeys});
  const performerOptions=enabled=>({enabled,getEffects:performTargets,onChange:()=>{saveSession();},onFreeze:v=>{touchFreeze=v;},onStutter:()=>{renderer.stutterUntil=performance.now()+160;},onRelease:moved=>{if(moved){commit();updateThumbs();}},status:()=>{},onGrab:grabKeys});
  mapUI=createMapUI({pushLayer,dropLayer,el,icon,tile,chip,button,label,slider,head,note,store,safe,saveBlob,openSheet,closeSheet,Generator,GEN_SOURCES,defaultGen,textSpec,speedFactor,FingerPerformer,performerOptions,mainCanvas:canvas,
@@ -999,6 +1016,6 @@ async function boot(){
  ensureSize();fitCanvas();renderStrip();requestAnimationFrame(loop);setTimeout(()=>updateThumbs(),200);
  try{if(!store.getItem('brainhertz.pixelpusher.tip16')){store.setItem('brainhertz.pixelpusher.tip16','1');hud('Hold preview = original  ·  drag = tweak effect');setTimeout(()=>hud(null),3800);}}catch{}
  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).catch(()=>{});
- globalThis.__pp={nav,get map(){return mapUI?.api;},get renderer(){return renderer;},perf,rebuildRenderer,get blackRun(){return blackRun;},get tl(){return tl;},beatData,clips,get clipList(){return clipList;},refreshClips,openReview,closeReview,get review(){return review;},renderRange,makeClip,useClip,seek,setPlaying,get rendering(){return rendering;},analyzeMedia,get stack(){return stack;},get lfos(){return lfos;},drawOwner,fxbOwner,get signals(){return signals;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
+ globalThis.__pp={nav,mixer:audio,get mixUI(){return mixUI;},get map(){return mapUI?.api;},get renderer(){return renderer;},perf,rebuildRenderer,get blackRun(){return blackRun;},get tl(){return tl;},beatData,clips,get clipList(){return clipList;},refreshClips,openReview,closeReview,get review(){return review;},renderRange,makeClip,useClip,seek,setPlaying,get rendering(){return rendering;},analyzeMedia,get stack(){return stack;},get lfos(){return lfos;},drawOwner,fxbOwner,get signals(){return signals;},get gen(){return gen;},useGen,get generator(){return generator;},GEN_SOURCES,get sourceKind(){return sourceKind;},video,fxPaint,fxBrush,get tab(){return tab;},history,drawing,frames,get frameList(){return frameList;},setTab,tapEffect,captureFrame,refreshFrames,buildZip,version:VERSION};
 }
 boot();
