@@ -2,36 +2,56 @@
 // Input (mic / audio interface) only after an explicit tap, never in the background, never heard unless "Hear input" is on.
 // The limited master feeds the analyser (Motion audio + live KICK/HITS) and a MediaStream for recording. Speakers get a monitor
 // mix: video + app sounds, plus the input only when "Hear input" is on (headphones; avoids feedback).
-export const CHANNELS=[['input','Input'],['video','Video audio'],['app','App sounds'],['link','Link']];
-export const SEND_SOURCES=[['off','Off'],['master','Mix'],['input','Input'],['video','Video'],['app','App']];
+// Native app only (Capacitor build): native-web/native-audio.js defines PixelPusherNativeAudio before this module loads.
+// In a browser it is undefined and every native branch below is skipped, so the web mixer is unchanged.
+export const NA=globalThis.PixelPusherNativeAudio||null;
+export const HAS_INTERNAL=!!NA?.internal;
+export const CHANNELS=[['input','Input'],['video','Video audio'],['app','App sounds'],['link','Link'],...(HAS_INTERNAL?[['internal','Internal']]:[])];
+export const SEND_SOURCES=[['off','Off'],['master','Mix'],['input','Input'],['video','Video'],['app','App'],...(HAS_INTERNAL?[['internal','Internal']]:[])];
+const SUM_IDS=['input','video','app',...(HAS_INTERNAL?['internal']:[])];
 export const GAIN_MAX=2;           // +6 dB
 export const CEILING=0.966;        // -0.3 dBFS brickwall
 export const DB_FLOOR=-90;
+// Brickwall limiter settings shared by master, monitor and Link send.
+export const LIM={threshold:-6,knee:0,ratio:20,attack:.001,release:.08};
+// Web Audio spec (and the WebKit/Blink kernel it came from): DynamicsCompressorNode ALWAYS adds automatic makeup gain,
+// (1 / fullRangeGain)^0.6 where fullRangeGain is the curve's output at 0 dBFS. With threshold -6, ratio 20, knee 0 that is
+// 0.6 * 5.7 = +3.42 dB on everything, even below the threshold, so the master read ~3.4 dB hotter than the channels (fixed in 1.8.3).
+// Hard-knee only (all our limiters use knee 0).
+export function makeupDb(threshold=LIM.threshold,ratio=LIM.ratio){const fullOut=threshold+(0-threshold)/ratio;return 0.6*-fullOut;}
+// Compressor + trim that cancels the makeup gain: unity below the threshold. Returns {comp,out}; feed comp, take audio from out.
+export function makeLimiter(c){const comp=c.createDynamicsCompressor();for(const k of ['threshold','knee','ratio','attack','release'])comp[k].value=LIM[k];
+ const out=c.createGain();out.gain.value=10**(-makeupDb()/20);comp.connect(out);return {comp,out};}
 const clamp=(v,a,b,d)=>Number.isFinite(+v)?Math.min(b,Math.max(a,+v)):d;
 export const toDb=x=>x>0?Math.max(DB_FLOOR,20*Math.log10(x)):DB_FLOOR;
 export const fromDb=db=>db<=DB_FLOOR?0:10**(db/20);
 export const fmtGain=g=>g<=0.0005?'−∞ dB':((v)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1)+' dB')(toDb(g));
 export const fmtPan=p=>Math.abs(p)<.02?'C':(p<0?'L ':'R ')+Math.round(Math.abs(p)*100);
 const defCh=(gain,mute)=>({gain,mute,solo:false,pan:0});
-export function defaultMix(){return {v:1,master:{gain:1},ch:{input:{...defCh(1,false),monitor:false,device:''},video:defCh(1,true),app:defCh(.5,true),link:defCh(1,false)},app:{tone:false,click:false},sink:''};}
+export function defaultMix(){const d={v:1,master:{gain:1},ch:{input:{...defCh(1,false),monitor:false,device:''},video:defCh(1,true),app:defCh(.5,true),link:defCh(1,false)},app:{tone:false,click:false},sink:''};
+ if(NA){d.ch.input.nch=null;} // native: optional channel pair [l,r] on a multichannel interface
+ if(HAS_INTERNAL)d.ch.internal={...defCh(1,false),monitor:false}; // you already hear the other app; monitor off avoids doubling
+ return d;}
+const okPair=v=>Array.isArray(v)&&v.length===2&&v.every(n=>Number.isInteger(n)&&n>=0&&n<64)?[v[0],v[1]]:null;
 export function normalizeMix(raw){
  const d=defaultMix();if(!raw||typeof raw!=='object')return d;
  d.master.gain=clamp(raw.master?.gain,0,GAIN_MAX,1);
  for(const [id] of CHANNELS){const r=raw.ch?.[id];if(!r||typeof r!=='object')continue;const c=d.ch[id];
   c.gain=clamp(r.gain,0,GAIN_MAX,c.gain);c.pan=clamp(r.pan,-1,1,0);c.mute=!!r.mute;c.solo=!!r.solo;
-  if(id==='input'){c.monitor=!!r.monitor;c.device=typeof r.device==='string'&&r.device.length<=256?r.device:'';}}
+  if(id==='input'){c.monitor=!!r.monitor;c.device=typeof r.device==='string'&&r.device.length<=256?r.device:'';if(NA)c.nch=okPair(r.nch);}
+  if(id==='internal')c.monitor=!!r.monitor;}
  d.app.tone=!!raw.app?.tone;d.app.click=!!raw.app?.click;
  d.sink=typeof raw.sink==='string'&&raw.sink.length<=256?raw.sink:'';
  return d;
 }
 // Linear gain each channel contributes to the master after mute / solo / on-air. Solo wins over mute on other channels.
-export function effectiveGains(mix,armed,linkOn=false){
+export function effectiveGains(mix,armed,linkOn=false,internalOn=false){
  const anySolo=CHANNELS.some(([id])=>mix.ch[id].solo),out={};
- for(const [id] of CHANNELS){const c=mix.ch[id];let g=c.mute?0:c.gain;if(anySolo&&!c.solo)g=0;if(id==='input'&&!armed)g=0;if(id==='link'&&!linkOn)g=0;out[id]=g;}
+ for(const [id] of CHANNELS){const c=mix.ch[id];let g=c.mute?0:c.gain;if(anySolo&&!c.solo)g=0;if(id==='input'&&!armed)g=0;if(id==='link'&&!linkOn)g=0;if(id==='internal'&&!internalOn)g=0;out[id]=g;}
  return out;
 }
 // Studio-wide audio mode, derived from what is actually audible in the mix (keeps 1.7 Motion / Beat logic working).
-export function modeOf(mix,armed,linkOn=false){const g=effectiveGains(mix,armed,linkOn),mic=g.input>0,other=g.video>0||g.link>0||(g.app>0&&(mix.app.tone||mix.app.click));return mic&&other?'mix':mic?'mic':other?'video':'none';}
+export function modeOf(mix,armed,linkOn=false,internalOn=false){const g=effectiveGains(mix,armed,linkOn,internalOn),mic=g.input>0,other=g.video>0||g.link>0||g.internal>0||(g.app>0&&(mix.app.tone||mix.app.click));return mic&&other?'mix':mic?'mic':other?'video':'none';}
 // Peak + RMS of a time-domain block (linear 0..1+).
 export function measure(buf){let peak=0,sum=0;for(let i=0;i<buf.length;i++){const v=buf[i],a=v<0?-v:v;if(a>peak)peak=a;sum+=v*v;}return {peak,rms:buf.length?Math.sqrt(sum/buf.length):0};}
 // Meter ballistics in dB: instant attack, peak falls 24 dB/s, peak-hold 1.2 s.
@@ -42,9 +62,9 @@ export const panGains=p=>{const a=(clamp(p,-1,1,0)+1)*Math.PI/4;return [Math.cos
 export const sinkSupported=()=>{const A=globalThis.AudioContext;return !!(A&&'setSinkId' in A.prototype);};
 
 export class Mixer{
- constructor(video){this.video=video;this.mix=defaultMix();this.armed=false;this.mic=null;this.mode='none';this.bandLevels={low:0,mid:0,high:0};this.listeners=new Set();this.meter={};this.lastMeter=0;this.notice='';this.clickNext=0;}
+ constructor(video){this.video=video;this.mix=defaultMix();this.armed=false;this.mic=null;this.mode='none';this.bandLevels={low:0,mid:0,high:0};this.listeners=new Set();this.meter={};this.lastMeter=0;this.notice='';this.clickNext=0;if(NA)this.bindNative();}
  on(fn){this.listeners.add(fn);return ()=>this.listeners.delete(fn);}
- emit(why){this.mode=modeOf(this.mix,this.armed,this.linkOn);for(const f of this.listeners){try{f(why);}catch(e){console.warn(e);}}}
+ emit(why){this.mode=modeOf(this.mix,this.armed,this.linkOn,this.internalOn);for(const f of this.listeners){try{f(why);}catch(e){console.warn(e);}}}
  get state(){return this.ctx?this.ctx.state:'off';}
  load(raw){this.mix=normalizeMix(raw);this.mix.app.tone=this.mix.app.click=false; // never start a tone or click by surprise after reload
   this.apply();this.emit('load');}
@@ -54,15 +74,15 @@ export class Mixer{
    const A=window.AudioContext||window.webkitAudioContext;if(!A)throw new Error('Web Audio is unavailable. Silent export is still available.');
    const c=this.ctx=new A();this.nodes={};
    const master=this.masterIn=c.createGain();
-   const lim=this.limiter=c.createDynamicsCompressor();lim.threshold.value=-6;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.001;lim.release.value=.08;
+   const L=makeLimiter(c),lim=this.limiter=L.comp;
    const clip=c.createWaveShaper();const n=2049,curve=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*2-1;curve[i]=Math.max(-CEILING,Math.min(CEILING,x*1.0));}clip.curve=curve;clip.oversample='2x';
    // WaveShaper input outside -1..1 maps to the curve ends (= ceiling), so this is a true brickwall after the compressor.
-   const pre=c.createGain();pre.gain.value=1;master.connect(lim);lim.connect(pre);pre.connect(clip);this.clipper=clip;
+   const pre=L.out;master.connect(lim);pre.connect(clip);this.clipper=clip;
    this.analyser=c.createAnalyser();this.analyser.fftSize=256;this.analyser.smoothingTimeConstant=.75;this.data=new Uint8Array(this.analyser.frequencyBinCount);
    this.masterMeter=c.createAnalyser();this.masterMeter.fftSize=1024;
    this.dest=c.createMediaStreamDestination();clip.connect(this.analyser);clip.connect(this.masterMeter);clip.connect(this.dest);
-   const mon=this.monBus=c.createGain();const monLim=c.createDynamicsCompressor();monLim.threshold.value=-6;monLim.knee.value=0;monLim.ratio.value=20;monLim.attack.value=.001;monLim.release.value=.08;
-   mon.connect(monLim);monLim.connect(c.destination);
+   const mon=this.monBus=c.createGain();const ML=makeLimiter(c),monLim=ML.comp;this.monOut=ML.out;
+   mon.connect(monLim);this.monOut.connect(c.destination);
    for(const [id] of CHANNELS){const n={};n.in=c.createGain();n.fader=c.createGain();n.gate=c.createGain();n.gate.gain.value=0;n.mon=c.createGain();n.mon.gain.value=0;
     n.meter=c.createAnalyser();n.meter.fftSize=1024;n.in.connect(n.fader);
     if(c.createStereoPanner){n.pan=c.createStereoPanner();n.fader.connect(n.pan);n.pan.connect(n.gate);}else{n.fader.connect(n.gate);}
@@ -78,13 +98,13 @@ export class Mixer{
  // iOS: an AudioContext only starts inside a tap. Called from a global pointerdown; also resumes after interruptions (calls, Siri, other apps).
  unlock(){if(!this.ctx){if(modeOf(this.mix,false)!=='none'&&!document.hidden)this.ensure().then(()=>this.emit('state')).catch(()=>{});return;}if(this.ctx&&this.ctx.state!=='running'&&this.ctx.state!=='closed'&&!document.hidden)this.ctx.resume().then(()=>this.emit('state')).catch(()=>{});}
  apply(){
-  const m=this.mix,g=effectiveGains(m,this.armed,this.linkOn);
+  const m=this.mix,g=effectiveGains(m,this.armed,this.linkOn,this.internalOn);
   if(this.video)this.video.muted=!this.ctx||!(g.video>0);
   if(!this.ctx)return;const t=this.ctx.currentTime,set=(p,v)=>{try{p.setTargetAtTime(v,t,.015);}catch{p.value=v;}};
   set(this.masterIn.gain,m.master.gain);set(this.monBus.gain,m.master.gain);if(this.sendSum)set(this.sendSum.gain,m.master.gain);
   for(const [id] of CHANNELS){const n=this.nodes[id],c=m.ch[id];set(n.fader.gain,c.gain);if(n.pan)set(n.pan.pan,c.pan);
-   const open=c.mute||(CHANNELS.some(([k])=>m.ch[k].solo)&&!c.solo)||(id==='input'&&!this.armed)||(id==='link'&&!this.linkOn)?0:1;set(n.gate.gain,open);
-   set(n.mon.gain,id==='input'?(c.monitor?1:0):1);}
+   const open=c.mute||(CHANNELS.some(([k])=>m.ch[k].solo)&&!c.solo)||(id==='input'&&!this.armed)||(id==='link'&&!this.linkOn)||(id==='internal'&&!this.internalOn)?0:1;set(n.gate.gain,open);
+   set(n.mon.gain,id==='input'||id==='internal'?(c.monitor?1:0):1);}
   this.syncApp();
  }
  set(path,value){const [a,b,k]=path.split('.');if(a==='master')this.mix.master[b]=value;else if(a==='ch')this.mix.ch[b][k]=value;else if(a==='app')this.mix.app[b]=value;this.mix=normalizeMix(this.mix);this.apply();this.emit('set');}
@@ -95,6 +115,11 @@ export class Mixer{
   if(!navigator.mediaDevices?.getUserMedia)throw new Error('Input needs HTTPS and microphone permission.');
   if(document.hidden)throw new Error('Input can only start while the app is on screen.');
   this.disarm(false);
+  if(NA){const ci=this.mix.ch.input;
+   if(ci.device)await NA.setInput(ci.device).catch(()=>{ci.device='';}); // native port uid: the system routes getUserMedia to it
+   if(ci.nch&&NA.usbChannels){const h=await NA.startInput(this.ctx,{uid:ci.device,channels:ci.nch});if(document.hidden){h.stop();throw new Error('Input cancelled because the app went to the background.');}
+    this.nativeIn=h;this.nativeLabel=(h.info?.total>2?'Ch '+(h.info.channels[0]+1)+'+'+(h.info.channels[1]+1)+' of '+h.info.total:'')||'';h.node.connect(this.nodes.input.in);this.armed=true;this.apply();this.emit('arm');return;}
+   device='';}
   const audio={echoCancellation:false,noiseSuppression:false,autoGainControl:false};if(device)audio.deviceId={exact:device};
   let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio,video:false});}catch(e){if(device&&e?.name==='OverconstrainedError'){this.mix.ch.input.device='';return this.arm('');}throw e;}
   if(document.hidden){stream.getTracks().forEach(t=>t.stop());throw new Error('Input cancelled because the app went to the background.');}
@@ -102,14 +127,14 @@ export class Mixer{
   for(const t of stream.getAudioTracks())t.addEventListener('ended',()=>{if(this.mic===stream){this.disarm(false);this.notice='Input ended (device unplugged or permission changed).';this.emit('ended');}});
   this.apply();this.emit('arm');
  }
- disarm(emit=true){if(this.mic){this.mic.getTracks().forEach(t=>t.stop());try{this.micNode?.disconnect();}catch{}this.mic=null;this.micNode=null;}const was=this.armed;this.armed=false;this.apply();if(emit&&was)this.emit('disarm');}
+ disarm(emit=true){if(this.nativeIn){const h=this.nativeIn;this.nativeIn=null;try{h.node.disconnect();}catch{}h.stop()?.catch?.(()=>{});}if(this.mic){this.mic.getTracks().forEach(t=>t.stop());try{this.micNode?.disconnect();}catch{}this.mic=null;this.micNode=null;}const was=this.armed;this.armed=false;this.apply();if(emit&&was)this.emit('disarm');}
  stopMic(){this.disarm();}
- inputLabel(){return this.mic?.getAudioTracks()[0]?.label||'';}
+ inputLabel(){return this.nativeIn?('Interface '+(this.nativeLabel||'')).trim():this.mic?.getAudioTracks()[0]?.label||'';}
  async inputs(){try{return (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput');}catch{return [];}}
  async outputs(){if(!sinkSupported())return [];try{return (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audiooutput');}catch{return [];}}
  async setSink(id){if(!sinkSupported())return false;await this.ensure();await this.ctx.setSinkId(id||'');this.mix.sink=id||'';this.emit('sink');return true;}
  // Page hidden: input stops for good (privacy), app sounds stop, the graph suspends. Nothing restarts until a tap.
- pageHidden(){const was=this.armed;this.disarm(false);if(was)this.notice='Input stopped when the app left the screen. Tap Go on air to start it again.';this.stopApp();if(this.ctx&&this.ctx.state==='running')this.ctx.suspend().catch(()=>{});this.emit('hidden');}
+ pageHidden(){const was=this.armed;this.disarm(false);if(was)this.notice='Input stopped when the app left the screen. Tap Go on air to start it again.';if(this.internalOn){this.stopInternal(false);this.internalNotice='Internal audio stopped listening when the app left the screen. The system broadcast may still be on: stop it from the red status pill or Control Center.';}this.stopApp();if(this.ctx&&this.ctx.state==='running')this.ctx.suspend().catch(()=>{});this.emit('hidden');}
  // ---- App sounds: test tone + tempo click ----
  syncApp(){if(!this.ctx)return;const a=this.mix.app;
   if(a.tone&&!this.tone){const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.frequency.value=440;g.gain.value=.25;o.connect(g);g.connect(this.nodes.app.in);o.start();this.tone={o,g};}
@@ -122,7 +147,7 @@ export class Mixer{
  // ---- Meters + analysis (same API as the 1.5 AudioEngine) ----
  readMeter(an){if(an.getFloatTimeDomainData){an.getFloatTimeDomainData(this.buf);return measure(this.buf);}const b=new Uint8Array(an.fftSize);an.getByteTimeDomainData(b);const f=new Float32Array(b.length);for(let i=0;i<b.length;i++)f[i]=(b[i]-128)/128;return measure(f);}
  meters(now=performance.now()){const dt=Math.min(.1,Math.max(0,(now-(this.lastMeter||now))/1000));this.lastMeter=now;const out=this.meter;
-  if(!this.ctx||this.ctx.state!=='running'){for(const id of ['input','video','app','link','master','send'])out[id]=ballistics(out[id]||{},{peak:0,rms:0},dt);out.gr=0;return out;}
+  if(!this.ctx||this.ctx.state!=='running'){for(const id of [...CHANNELS.map(c=>c[0]),'master','send'])out[id]=ballistics(out[id]||{},{peak:0,rms:0},dt);out.gr=0;return out;}
   for(const [id] of CHANNELS)out[id]=ballistics(out[id]||{},this.readMeter(this.nodes[id].meter),dt);
   out.send=ballistics(out.send||{},this.sendMeter&&this.sendId&&this.sendId!=='off'?this.readMeter(this.sendMeter):{peak:0,rms:0},dt);
   out.master=ballistics(out.master||{},this.readMeter(this.masterMeter),dt);out.gr=typeof this.limiter.reduction==='number'?this.limiter.reduction:this.limiter.reduction?.value||0;return out;}
@@ -143,7 +168,7 @@ export class Mixer{
  sendTrack(id){if(!this.ctx||id==='off'||!id)return null;const c=this.ctx;this.sendDests||(this.sendDests={});
   if(!this.sendMeter){this.sendMeter=c.createAnalyser();this.sendMeter.fftSize=1024;}
   if(!this.sendDests[id]){const d=c.createMediaStreamDestination();
-   if(id==='master'){if(!this.sendSum){this.sendSum=c.createGain();this.sendSum.gain.value=this.mix.master.gain;const lim=c.createDynamicsCompressor();lim.threshold.value=-6;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.001;lim.release.value=.08;this.sendSum.connect(lim);this.sendLim=lim;for(const k of ['input','video','app'])this.nodes[k].gate.connect(this.sendSum);}this.sendLim.connect(d);}
+   if(id==='master'){if(!this.sendSum){this.sendSum=c.createGain();this.sendSum.gain.value=this.mix.master.gain;const SL=makeLimiter(c);this.sendSum.connect(SL.comp);this.sendLim=SL.out;this.sendComp=SL.comp;for(const k of SUM_IDS)this.nodes[k].gate.connect(this.sendSum);}this.sendLim.connect(d);}
    else if(this.nodes[id]&&id!=='link')this.nodes[id].gate.connect(d);else return null;this.sendDests[id]=d;}
   const src=id==='master'?this.sendLim:this.nodes[id].gate;try{this.sendSrc?.disconnect(this.sendMeter);}catch{}src.connect(this.sendMeter);this.sendSrc=src;this.sendId=id;
   return this.sendDests[id].stream.getAudioTracks()[0]||null;}
@@ -153,4 +178,13 @@ export class Mixer{
   const a=this.linkEl||(this.linkEl=document.createElement('audio'));a.muted=true;a.srcObject=stream;a.play?.().catch(()=>{});
   this.linkNode=this.ctx.createMediaStreamSource(stream);this.linkNode.connect(this.nodes.link.in);this.linkOn=true;this.apply();this.emit('link');}
  detachLink(emit=true){try{this.linkNode?.disconnect();}catch{}this.linkNode=null;if(this.linkEl){this.linkEl.srcObject=null;}const was=this.linkOn;this.linkOn=false;this.apply();if(emit&&was)this.emit('link');}
+ // ---- Internal audio (native app only): ReplayKit broadcast extension -> App Group ring -> PPAudio -> worklet -> this channel ----
+ async startInternal(){if(!HAS_INTERNAL)throw new Error('Internal audio needs the Pixel Pusher app.');await this.ensure();this.stopInternal(false);this.internalNotice='';
+  const h=await NA.startInternal(this.ctx);h.node.connect(this.nodes.internal.in);this.internalH=h;this.internalOn=true;this.apply();this.emit('internal');}
+ stopInternal(emit=true){const h=this.internalH;this.internalH=null;if(h){try{h.node.disconnect();}catch{}h.stop()?.catch?.(()=>{});}const was=this.internalOn;this.internalOn=false;this.internalLive=false;this.apply();if(emit&&was)this.emit('internal');}
+ bindNative(){if(!NA||this.nativeBound)return;this.nativeBound=true;
+  NA.on('internal',d=>{this.internalLive=!!d.running;this.emit('internal');});
+  NA.on('interruption',d=>{if(d.type==='began'&&this.armed&&this.nativeIn){this.disarm(false);this.notice='Input stopped by a call or another app. Tap Go on air to start it again.';this.emit('ended');}else this.emit('state');});
+  NA.on('routeChange',d=>{this.route=d.route||null;this.emit('route');});
+  NA.on('mediaReset',()=>{this.disarm(false);this.stopInternal(false);this.notice='The system audio service restarted. Tap Go on air to start the input again.';this.emit('ended');});}
 }

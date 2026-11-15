@@ -293,6 +293,7 @@ body.on-air .mx-ch.input{border-color:var(--red);box-shadow:0 0 16px rgba(255,43
 .mx-top .chip{min-width:44px;min-height:40px;justify-content:center;font-weight:800}
 .mx-m.on{border-color:var(--red);color:#ff3b4b;background:#260b06}.mx-s.on{border-color:var(--purple);color:#a48cff;background:#140d33}
 .mx-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mx-ch.internal{border-color:#2a3a8e}.mx-ch.internal.live{border-color:var(--red);box-shadow:0 0 16px rgba(255,43,61,.22)}.mx-sub.live{color:#ff2b3d;font-weight:700}.mx-route-btn{flex:1;min-height:48px}
 .mx-air{flex:1;min-height:48px}.mx-air.on{border-color:var(--red);color:#fff;background:linear-gradient(180deg,#3a0d08,#1c0704)}
 .mx-meter{display:flex;flex-direction:column;gap:2px}.mx-meter canvas{width:100%;height:16px;border-radius:5px;border:1px solid var(--line);display:block}
 .mx-db,.mx-sub{font-size:10.5px;color:var(--muted);letter-spacing:.04em;font-variant-numeric:tabular-nums}.mx-sub.warn{color:#ff3b4b}
