@@ -1,0 +1,217 @@
+NICHE' END USER LICENSE AGREEMENT
+
+Niche' version 1.5.3 and later updates provided under Section 8
+Licensor: BRAINHERTZ LLC, a Virginia limited liability company, doing business as Brainhertz Productions
+140 North Briar Mountain Road, Callands, Virginia 24530, USA · support@brainhertzproductions.com
+Last updated: [release date]
+
+PLEASE READ THIS AGREEMENT BEFORE YOU INSTALL OR USE NICHE'. When you click "I Agree", or install, activate or use Niche', you accept this agreement. If you don't accept it, don't install or use Niche'. If you already paid, you can get a full refund under Section 9.
+
+This agreement is between you and BRAINHERTZ LLC ("Brainhertz", "we", "us"). "You" means the person who accepts it. If you accept for a company, school or other organization, you confirm that you can bind it, and "you" includes it.
+
+If you are under 18, a parent or legal guardian must read and accept this agreement for you.
+
+1. Definitions
+
+- "Software" means the Niche' desktop application in object-code form, its installer, built-in effects, shader packs, presets, skins, fonts, documentation, and any updates we provide under Section 8.
+- "License Key" means the key we issue when you buy a license or are approved for a Student or Teacher license.
+- "Seat" means one activation of the Software on one computer, as recorded by our license server.
+- "Edition" means the version you licensed (for example Lite, Standard, Full, Student or Teacher), as shown in your order confirmation and in the Software's About window.
+- "Your Content" means the media, projects, mappings, presets and other material you create, load or produce with the Software, including the video output and recordings of your performances.
+- "Third-Party Components" means the open-source and third-party software and fonts listed in THIRD_PARTY_LICENSES.md and the licenses folder.
+
+2. License grant
+
+2.1 Licensed use. If you have paid for your License Key, or we approved you for a Student or Teacher license, we grant you a perpetual, non-exclusive, non-transferable, non-sublicensable license to install and use the Software in your Edition on up to the number of Seats shown in your order confirmation. If no number is shown, the Seats are: Lite, one (1) computer; Standard, two (2) computers; Full, three (3) computers; and for any other Edition, including Student and Teacher, two (2) computers. You may use it for personal, professional and commercial work, including paid performances, except where Section 6 says otherwise for Student and Teacher licenses.
+
+2.2 Trial (unlicensed) use. Without an activated License Key you may install and use the Software free of charge to evaluate it and for non-commercial use. Unlicensed output carries a visible "Niche' - Unlicensed" watermark.
+
+2.3 Seats and transfers. Each Seat is one computer that you own or control. You may move a Seat to another computer with License > Deactivate this PC. Our server allows up to three (3) transfers per License Key in any 30-day period. If you lose access to a computer, contact us and we will release the Seat.
+
+2.4 Backup copies. You may keep copies of the installer and your License Key for backup and reinstall.
+
+2.5 License, not sale. The Software is licensed, not sold. We and our licensors keep all rights not expressly granted, including all copyright, trademark and other intellectual property rights in the Software. "Niche'" and "Brainhertz Productions" are our trademarks.
+
+3. Restrictions
+
+Except as Section 4 allows or the law allows despite this restriction, you will not:
+
+a) sell, rent, lease, lend, sublicense, publish or share the Software or a License Key, or let anyone else use your License Key;
+b) activate more Seats than you have licensed, or use any method to bypass the Seat limit;
+c) remove, hide or bypass the license check, the watermark, or any copyright or license notice;
+d) reverse engineer, decompile or disassemble the Software;
+e) extract the built-in shader packs, effects, presets, skins or other in-house assets and distribute them on their own, or use them to build a competing product. Using them in your own Content and performances is allowed under Section 5; or
+f) use the Software in violation of any law, including the export laws in Section 14.
+
+Nothing in this agreement stops you from publicly discussing, reviewing, benchmarking or criticizing the Software.
+
+4. Third-party components and open-source rights
+
+4.1 Their terms apply. Third-Party Components are licensed to you under their own licenses, which are listed in THIRD_PARTY_LICENSES.md and included in the licenses folder. Where a Third-Party Component's license gives you rights that this agreement would otherwise restrict, that license controls for that component.
+
+4.2 FFmpeg (GNU LGPL version 3). The Software uses the FFmpeg libraries (avcodec, avformat, avutil, avfilter, avdevice, swscale and swresample) as separate, unmodified, dynamically linked DLLs. They are licensed under the GNU Lesser General Public License version 3 (LGPLv3), which incorporates the GNU General Public License version 3. Copies of both licenses are in the licenses folder. Notwithstanding Sections 3(c) and 3(d) and anything else in this agreement:
+- you may replace or modify the FFmpeg DLLs with your own interface-compatible build of FFmpeg and use it with the Software; and
+- you may reverse engineer the Software as far as needed to debug those modifications.
+
+Doing so does not void your license. We just can't provide support for builds we didn't ship.
+
+4.3 FFmpeg source code. The complete corresponding source code for the FFmpeg build we ship, and the scripts used to build it, is available free of charge at brainhertzproductions.com/niche/source, next to the Software download. We will keep it available for at least three (3) years after we last distribute this version, and as long as the LGPL requires. You may also request a copy at support@brainhertzproductions.com.
+
+4.4 Fonts. The Software includes the Inter, Big Shoulders Display and JetBrains Mono fonts under the SIL Open Font License 1.1, and the Lucide icon font under the ISC License. You may use them as the OFL and ISC licenses allow. The fonts may not be sold on their own.
+
+4.5 Other software you add. FFGL plug-ins, NDI runtimes, drivers, media and other third-party material that you install or load are not part of the Software and are governed by their own terms.
+
+5. Your content and performances
+
+5.1 You own your output. As between you and us, you own Your Content, including everything you create or perform with the Software. We claim no rights in it and you owe us no royalties for it.
+
+5.2 Built-in effects in your output. You may use the visuals produced by the Software's built-in effects, shader packs, presets and fonts in Your Content and performances, including commercial performances, videos, streams and recordings, without any further license or fee. This does not let you redistribute the effect files or shader source themselves (Section 3(e)).
+
+5.3 Third-party media. You are responsible for having the rights to any media, music, logos, footage or plug-ins you use with the Software.
+
+5.4 We don't receive your files. The Software does not upload Your Content. See Section 11.
+
+6. Student and Teacher licenses
+
+6.1 Eligibility. Student licenses (75% off) are for people currently enrolled at an accredited school, college or university. Teacher licenses (free) are for people currently employed as teachers or instructors at such an institution. We verify eligibility by hand, and we may ask for reasonable proof.
+
+6.2 Personal and educational use. Student and Teacher licenses are personal to the verified person and may not be transferred. They may be used for learning, teaching, coursework and personal projects. They may not be used for paid commercial work. Upgrade to a full license for that.
+
+6.3 Classrooms. A Teacher license covers the teacher's own computers and showing the Software in class. Installing it on shared or lab computers needs a separate school license, so contact us.
+
+6.4 False information. If you gave false eligibility information, we may refuse to issue the license, or end it with notice under Section 12.
+
+7. Activation and automatic license controls
+
+7.1 What the Software does. You agree that the Software may use these automatic controls to enforce the scope of your license:
+- it shows a watermark when it isn't activated;
+- it limits activations to your number of Seats;
+- it checks in with our license server about every 3 days while online. If it can't reach the server, it keeps working licensed for 14 days and then shows the watermark until a check-in succeeds;
+- it shows the watermark if the system clock is set back more than about an hour; and
+- it shows the watermark if a License Key was refunded, its payment was reversed, it was not validly issued, or it was released from that computer.
+
+7.2 What the controls don't do. These controls never delete, lock or block access to Your Content or your projects. With the watermark on, the Software still works.
+
+7.3 Shared or leaked keys. If a License Key is published or used beyond its Seats, we may block further activations of that key. If you are the original buyer, we will issue you a replacement key after we verify your purchase.
+
+7.4 No remote disabling for disputes. We will not use the license server to disable a paid license because we claim you breached this agreement. We will contact you instead under Section 12.
+
+8. Updates and support
+
+8.1 Updates. While we continue to offer updates to the Software, licensed users receive those updates at no extra charge, including future major versions. We do not promise that we will keep developing or releasing updates. This does not include separately sold products, Editions or add-ons, which we may offer for a fee. Updates are covered by this agreement unless they come with new terms, which you may accept or decline. Declining an update doesn't end your license to the version you have.
+
+8.2 Upgrades between Editions. You may upgrade your Edition by paying the price difference that applies at the time.
+
+8.3 Support. We offer reasonable email support at support@brainhertzproductions.com. We may change, add or remove features in future versions.
+
+9. Refunds
+
+9.1 30-day refund. If you are not satisfied, or if you didn't see this agreement before you paid and you don't accept it, email support@brainhertzproductions.com within 30 days of purchase with your order email and License Key. We will refund the full price to your original payment method: through Stripe for card payments, or by Zelle to the sending account for Zelle payments. If you don't accept this agreement, don't install or use the Software.
+
+9.2 After a refund. When we refund you, your license ends and your License Key is deactivated, so the Software returns to trial mode with the watermark. Your files stay yours.
+
+9.3 Chargebacks. If a payment is reversed or charged back, your License Key is deactivated as if refunded. If the reversal was a mistake, contact us and we will reactivate your key once payment is restored.
+
+9.4 Free licenses. Teacher licenses are free, so no refund applies.
+
+9.5 Your legal rights. This section doesn't limit any refund or withdrawal right you have under the consumer law of the place where you live.
+
+10. Warranty disclaimer
+
+10.1 THE SOFTWARE IS PROVIDED "AS IS" AND "WITH ALL FAULTS". EXCEPT FOR EXPRESS WARRANTIES STATED IN THIS AGREEMENT (THERE ARE NONE), THE ENTIRE RISK AS TO SATISFACTORY QUALITY, PERFORMANCE, ACCURACY AND EFFORT IS WITH YOU. TO THE MAXIMUM EXTENT PERMITTED BY LAW, BRAINHERTZ AND ITS LICENSORS DISCLAIM ALL IMPLIED WARRANTIES AND CONDITIONS, INCLUDING THE IMPLIED WARRANTIES OF MERCHANTABILITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, SYSTEM INTEGRATION AND QUIET ENJOYMENT.
+
+10.2 THERE IS NO WARRANTY THAT THE SOFTWARE, OUR EFFORTS OR YOUR SYSTEM WILL FULFILL ANY OF YOUR PARTICULAR PURPOSES OR NEEDS, THAT THE SOFTWARE WILL RUN WITHOUT INTERRUPTION OR ERRORS, OR THAT IT WILL WORK WITH YOUR HARDWARE, GPU, DRIVERS, PROJECTORS, CAPTURE DEVICES, CONTROLLERS, PLUG-INS OR NETWORK.
+
+10.3 LIVE PERFORMANCE: SOFTWARE CAN FAIL. YOU ARE RESPONSIBLE FOR TESTING NICHE' ON YOUR OWN EQUIPMENT (THE FREE TRIAL EXISTS FOR THIS) AND FOR HAVING BACKUPS BEFORE ANY SHOW, EVENT OR BROADCAST.
+
+10.4 Some places don't allow these exclusions, so some of them may not apply to you. In that case any implied warranty lasts only as long as the law requires, up to 14 days from purchase.
+
+11. Privacy and data
+
+11.1 Unlicensed use sends nothing. Without a License Key, the Software makes no network connection to us.
+
+11.2 What activation and check-ins send. When you activate, check in or deactivate, the Software sends our license server:
+- your License Key or activation token;
+- a one-way hash of this computer's hardware IDs (the raw IDs are not sent);
+- the computer's name; and
+- your IP address, which every internet connection reveals. We use it for rate-limiting and security logs.
+
+We use this only to run licensing: counting Seats, transfers, and detecting copied, refunded or revoked keys.
+
+11.3 When you buy or apply for a discount. We receive your name, email, Edition, payment method, order number and any note you send. For Zelle payments, we also receive any payment proof you upload. For Student and Teacher licenses, we also receive your proof of eligibility. Card payments are processed by Stripe, and we do not receive your full card number.
+
+11.4 What is never sent. We never receive your files, media, projects, settings, logs, camera or microphone data, usage analytics or crash reports. The Software has no telemetry.
+
+11.5 Retention.
+- License records are kept while the license exists, plus 3 years for tax and dispute records.
+- A computer's entry is removed when you deactivate it.
+- Security logs, including IP addresses, are kept for 12 months.
+- Student and Teacher proof images are deleted within 30 days after review.
+
+11.6 Sharing. We don't sell or rent personal data. We share it only with our service providers (payment processing, email delivery and server hosting) to run the business, or when the law requires it.
+
+11.7 Your choices. You can ask what we hold about you, or ask us to correct or delete it, at support@brainhertzproductions.com. If we delete it, any active license is deactivated. PRIVACY.txt, included with the Software, gives more detail.
+
+12. Term and termination
+
+12.1 Term. This agreement lasts until it ends under this Section.
+
+12.2 You may end it at any time by uninstalling the Software and deactivating your Seats.
+
+12.3 We may end it if you materially breach it and don't fix the breach within 30 days after we email you notice. For breaches that can't be fixed (for example, selling License Keys), we may end it with notice and no cure period.
+
+12.4 When it ends, you must stop using the licensed features and uninstall the Software. Sections 4, 5, 9.5, 10, 13, 15 and 16 survive. Your Content remains yours.
+
+13. Limitation of liability
+
+13.1 TO THE MAXIMUM EXTENT PERMITTED BY LAW, BRAINHERTZ, ITS MEMBERS AND ITS LICENSORS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES. THIS INCLUDES LOST PROFITS, LOST REVENUE, LOST BOOKINGS OR FEES, CANCELLED OR FAILED PERFORMANCES, LOST OR CORRUPTED DATA, AND EQUIPMENT DOWNTIME, ARISING FROM THIS AGREEMENT OR THE SOFTWARE, EVEN IF WE WERE TOLD THEY WERE POSSIBLE.
+
+13.2 OUR TOTAL LIABILITY FOR ALL CLAIMS RELATING TO THIS AGREEMENT OR THE SOFTWARE IS LIMITED TO THE GREATER OF (A) THE AMOUNT YOU PAID FOR YOUR LICENSE, OR (B) US $50.
+
+13.3 These limits apply even if a limited remedy fails of its essential purpose. They are independent of any remedy in this agreement.
+
+13.4 Nothing in this agreement limits liability that can't be limited by law, including liability for death or personal injury caused by negligence, for fraud, or for gross negligence or willful misconduct. It also doesn't limit your mandatory rights as a consumer.
+
+14. Export and sanctions
+
+The Software contains encryption, used for license signatures and secure connections, and is subject to U.S. export control and sanctions laws, including the Export Administration Regulations and the regulations of the Treasury Department's Office of Foreign Assets Control. You may not download, use or export the Software:
+- in or to any country or region subject to comprehensive U.S. sanctions; or
+- to or for anyone on a U.S. government restricted-party list.
+
+You confirm that you are not in such a place and not on such a list.
+
+15. Health and safety notice
+
+The Software can produce flashing lights, strobes and fast-changing patterns. These can trigger seizures in people with photosensitive epilepsy, and you are responsible for warning audiences where appropriate. You are also responsible for the safe installation and use of projectors, lasers, lighting fixtures and other equipment you control with the Software, and for following venue and local safety rules.
+
+16. Governing law and disputes
+
+16.1 Governing law. This agreement is governed by the laws of the Commonwealth of Virginia, USA, without regard to conflict-of-laws rules. The UN Convention on Contracts for the International Sale of Goods does not apply.
+
+16.2 EXCLUSIVE VENUE. EXCEPT AS SECTION 16.3 ALLOWS, ANY LAWSUIT ABOUT THIS AGREEMENT OR THE SOFTWARE MUST BE BROUGHT ONLY IN THE STATE COURTS LOCATED IN PITTSYLVANIA COUNTY, VIRGINIA, OR IN THE U.S. DISTRICT COURT FOR THE WESTERN DISTRICT OF VIRGINIA (DANVILLE DIVISION). YOU AND WE CONSENT TO THEIR PERSONAL JURISDICTION.
+
+16.3 Small claims and home-court rights. Either of us may bring an individual claim in a small-claims court where you live. If the law where you live gives consumers the right to sue in local courts, or applies local consumer-protection law despite this choice, you keep that right.
+
+16.4 Talk to us first. Before filing any claim, please email support@brainhertzproductions.com and give us 30 days to try to resolve it.
+
+17. General
+
+17.1 Entire agreement. This agreement, the Third-Party Component licenses and PRIVACY.txt are the entire agreement between you and us about the Software. They replace any earlier statements about it. Your order confirmation controls only your Edition, Seats and price.
+
+17.2 Changes. Changes to this agreement apply only to updates you choose to install after seeing the new terms. They never apply retroactively to a version you already accepted.
+
+17.3 Severability. If any part of this agreement is unenforceable, that part will be enforced to the maximum extent allowed and the rest stays in effect.
+
+17.4 No waiver. If we don't enforce a term, that is not a waiver of it.
+
+17.5 Assignment. You may not assign this agreement without our written consent. We may assign it to a successor to our business, and your license continues.
+
+17.6 Notices. We send notices to the email address on your order. You send notices to support@brainhertzproductions.com or by mail to BRAINHERTZ LLC, 140 North Briar Mountain Road, Callands, VA 24530.
+
+17.7 Electronic agreement. You agree that accepting electronically is as binding as a signature.
+
+17.8 U.S. government users. The Software is "commercial computer software" licensed under these terms only (48 C.F.R. 12.212 and 227.7202).
+
+17.9 Language. This English version controls.
+
+© 2026 BRAINHERTZ LLC, doing business as Brainhertz Productions. All rights reserved.

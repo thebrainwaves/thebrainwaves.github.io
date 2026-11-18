@@ -1,0 +1,52 @@
+NICHE' PRIVACY NOTICE
+Version 1.5.3
+BRAINHERTZ LLC, a Virginia limited liability company, doing business as Brainhertz Productions
+140 North Briar Mountain Road, Callands, Virginia 24530, USA · support@brainhertzproductions.com
+Last updated: [release date]
+
+This notice is the PRIVACY.txt included with Niche'. It matches Section 11 of the Niche' End User License Agreement. If there is a conflict, the more specific description of what we collect controls.
+
+1. Unlicensed use sends nothing
+
+Without a License Key, the Software makes no network connection to us. You may use the watermarked trial without sending us any data.
+
+2. What activation and check-ins send
+
+When you activate, check in or deactivate, the Software sends our license server:
+- your License Key or activation token;
+- a one-way hash of this computer's hardware IDs (the raw IDs are not sent);
+- the computer's name; and
+- your IP address, which every internet connection reveals. We use it for rate-limiting and security logs.
+
+We use this only to run licensing: counting Seats, transfers, and detecting copied, refunded or revoked keys.
+
+3. When you buy or apply for a discount
+
+We receive your name, email, Edition, payment method, order number and any note you send. For Zelle payments, we also receive any payment proof you upload. For Student and Teacher licenses, we also receive your proof of eligibility. Card payments are processed by Stripe, and we do not receive your full card number.
+
+4. What is never sent
+
+We never receive your files, media, projects, settings, logs, camera or microphone data, usage analytics or crash reports. The Software has no telemetry.
+
+5. Retention
+
+- License records are kept while the license exists, plus 3 years for tax and dispute records.
+- A computer's entry is removed when you deactivate it.
+- Security logs, including IP addresses, are kept for 12 months.
+- Student and Teacher proof images are deleted within 30 days after review.
+
+6. Sharing
+
+We don't sell or rent personal data. We share it only with our service providers (payment processing, email delivery and server hosting) to run the business, or when the law requires it.
+
+7. Your choices
+
+You can ask what we hold about you, or ask us to correct or delete it, at support@brainhertzproductions.com. If we delete it, any active license is deactivated.
+
+8. Local data on your computer
+
+Settings, logs, the license token and autosaves are stored only on your computer. Uninstalling the Software may leave that folder in place; you can delete it yourself to remove the local data.
+
+9. Notices
+
+We send notices to the email address on your order.

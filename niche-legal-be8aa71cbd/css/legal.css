@@ -1,0 +1,49 @@
+/* Niche' legal + store preview additions. Dark, defined borders; red / blue / violet / gold accents; no pink. Mobile-first. */
+.preview-tag{color:var(--gd-l);border:1px solid var(--gd);border-radius:999px;padding:4px 10px;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.seller,.seller-line{color:var(--mute);font-size:14px;margin:6px 0 0}.seller-line{text-align:center;margin:-8px 0 8px}.seller-line strong{color:var(--ink)}
+.buy-terms{font-size:12.5px;line-height:1.45;color:#cfc9de;margin:12px 0 0;padding:10px 12px;border:1px solid rgba(47,107,255,.45);border-left:3px solid var(--bl);border-radius:10px;background:rgba(47,107,255,.07)}
+.buy-terms a,.buy-legal a{color:#9cb6ff;text-decoration:underline;text-underline-offset:2px}
+.buy-legal{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:8px 0 0;font:600 12px var(--mono);letter-spacing:.04em}
+.buy-legal a{display:inline-flex;align-items:center;min-height:32px}
+.buy-legal span{color:var(--mute)}
+.tier li.seat{color:var(--gd-l);font-weight:600}.tier li.seat::before{background:var(--gd)}
+.legal{max-width:760px}.legal.wide{max-width:1000px}
+.legal h1{margin:8px 0 14px;line-height:1.1}
+.legal p,.legal li{line-height:1.6;font-size:16px}
+.legal .meta{margin:2px 0;color:var(--ink);font-size:14.5px}
+.legal h2{padding-top:18px;border-top:1px solid var(--line);scroll-margin-top:16px}
+.legal ul{padding-left:22px}.legal ul.alpha{list-style:none;padding-left:4px}.legal ul.alpha li{padding:3px 0}
+.legal code{font:13px var(--mono);background:#0b0d1c;border:1px solid var(--line);border-radius:6px;padding:1px 5px;word-break:break-word}
+.legal :target{outline:1px solid var(--gd);outline-offset:6px;border-radius:4px}
+.dl-txt{margin-top:28px;font:600 13px var(--mono)}
+.callout{margin:18px 0;padding:16px 18px;border:1px solid rgba(255,59,59,.55);border-left:4px solid var(--rd);border-radius:12px;background:rgba(200,16,46,.10);color:var(--ink);line-height:1.55}
+.callout a{color:#ffb4b4}
+.note{color:var(--mute);font-size:14px}
+.eula-quote{margin:12px 0;padding:6px 18px;border:1px solid var(--line);border-left:3px solid var(--vi);border-radius:12px;background:rgba(138,61,255,.07)}
+.kv{display:grid;grid-template-columns:1fr;gap:2px 18px;margin:8px 0 0;border:1px solid var(--line);border-radius:14px;padding:12px 16px;background:#070915}
+.kv dt{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--gd-l);margin-top:10px}.kv dt:first-child{margin-top:0}
+.kv dd{margin:2px 0 0;color:var(--ink);word-break:break-word}
+.hash{word-break:break-all}
+pre.cfg,pre.lic{font:12.5px/1.55 var(--mono);color:#d8d3e6;background:#060812;border:1px solid var(--line);border-radius:12px;padding:14px 16px;white-space:pre-wrap;word-break:break-word;overflow:auto}
+pre.lic{max-height:60vh}
+pre:focus-visible,.tbl-wrap:focus-visible{outline:2px solid var(--bl);outline-offset:2px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-top:1px solid var(--line)}
+thead th{border-top:0;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--gd-l);background:#080a18}
+td .sub-d{display:block;color:var(--mute);font-size:12.5px;margin-top:3px}
+td.num{white-space:nowrap}
+.deps code{font-size:12px}.deps code.path{color:var(--mute)}
+@media(max-width:640px){
+ .legal p,.legal li{font-size:15.5px}
+ table.deps thead{display:none}
+ table.deps tr{display:block;border-top:1px solid var(--line);padding:8px 0}
+ table.deps td{display:block;border:0;padding:3px 12px}
+ table.deps td:nth-child(4){display:none}
+ table.src thead{display:none}
+ table.src tr{display:block;border-top:1px solid var(--line);padding:8px 0}
+ table.src td{display:block;border:0;padding:4px 12px}
+}
+@media(min-width:720px){.kv{grid-template-columns:200px 1fr}.kv dt{margin-top:0;padding-top:8px}.kv dd{padding-top:6px}}
+/* Title gradient: hard stop between crimson and purple so the blend never passes through magenta/pink (the live niche.css blends them) */
+.hero .grad{background:linear-gradient(90deg,var(--rd),var(--cr) 50%,var(--pu) 50%,var(--vi));-webkit-background-clip:text;background-clip:text;color:transparent}
