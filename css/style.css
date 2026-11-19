@@ -944,7 +944,7 @@ html:not(.js) .mosh-demo{display:none}
 .brain3d-node[data-anchor="start"] .node-label{left:50px;text-align:left}
 .brain3d-node[data-anchor="middle"] .node-label{left:50%;top:-10px;transform:translate(-50%,-100%);text-align:center}
 .brain3d-node.is-back{opacity:.38}
-.brain3d-node.is-back .node-label{opacity:0}
+.brain3d-node.is-back .node-label,.brain3d-node.is-occluded .node-label{opacity:0;pointer-events:none}
 .brain3d-node:focus-visible{outline:2px solid var(--yl);outline-offset:4px;border-radius:50%}
 .hero.has-brain3d .field{opacity:.16;filter:blur(16px) saturate(.5) brightness(.4)}
 .hero.has-brain3d .brain-wrap::before{opacity:.28}

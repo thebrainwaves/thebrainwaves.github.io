@@ -2,7 +2,8 @@
    Original procedural mesh (two hemispheres with gyri/sulci, cerebellum tucked in — no brainstem).
    Clear glass shell (near-zero body, fresnel rim, studio speculars; folds as highlight lines)
    with Gray-Scott neon fluid on inset additive layers (transparent dark gaps).
-   Shape is a baked SDF mesh (js/brain-mesh.bin, BHB2) — cerebrum + tucked cerebellum, no stem.
+   Shape is a baked SDF mesh (js/brain-mesh.bin, BHB2) — cartoon scalloped cerebrum, no stem.
+   Optional per-vertex groove mask (flag byte 1) drives a neon/fresnel fold highlight.
    three.js r158 is lazy-loaded from js/vendor/ (MIT, CSP script-src 'self') after first paint.
    Fallback: the existing SVG glass brain, also used for prefers-reduced-motion and no-WebGL. */
 (function () {
@@ -82,14 +83,14 @@
     var narrow = window.matchMedia('(max-width: 720px)');
 
     var REGIONS = [
-      { id: 'about',   label: 'About',                         sub: 'Frontal · identity',        anchor: 'end',    pos: [-0.62,  0.28,  0.72] },
-      { id: 'plugins', label: 'Plugins',                       sub: 'Motor cortex · tools',      anchor: 'middle', pos: [-0.18,  0.72,  0.22] },
-      { id: 'live',    label: 'Live, Projection & Lighting',   sub: 'Parietal · space',          anchor: 'middle', pos: [ 0.42,  0.70, -0.18] },
-      { id: 'work',    label: 'Work',                          sub: 'Hippocampus · memory',      anchor: 'middle', pos: [ 0.08,  0.05,  0.10] },
-      { id: 'visuals', label: 'Visuals',                       sub: 'Occipital · sight',         anchor: 'start',  pos: [ 0.68,  0.18, -0.72] },
-      { id: 'sound',   label: 'Music & Sound',                 sub: 'Temporal · hearing',        anchor: 'end',    pos: [-0.78, -0.42,  0.12] },
-      { id: 'lab',     label: 'Real-time Lab',                 sub: 'Cerebellum · timing',       anchor: 'start',  pos: [ 0.42, -0.62, -0.78] },
-      { id: 'contact', label: 'Contact',                       sub: 'Output',                    anchor: 'start',  pos: [ 0.42, -0.52, -0.70] }
+      { id: 'about',   label: 'About',                         sub: 'Frontal · identity',        anchor: 'start',  pos: [-0.35,  0.22,  0.82] },
+      { id: 'plugins', label: 'Plugins',                       sub: 'Motor cortex · tools',      anchor: 'middle', pos: [-0.05,  0.78,  0.18] },
+      { id: 'live',    label: 'Live, Projection & Lighting',   sub: 'Parietal · space',          anchor: 'start',  pos: [ 0.48,  0.62, -0.32] },
+      { id: 'work',    label: 'Work',                          sub: 'Hippocampus · memory',      anchor: 'middle', pos: [ 0.10,  0.12,  0.72] },
+      { id: 'visuals', label: 'Visuals',                       sub: 'Occipital · sight',         anchor: 'end',    pos: [ 0.38,  0.16, -0.82] },
+      { id: 'sound',   label: 'Music & Sound',                 sub: 'Temporal · hearing',        anchor: 'end',    pos: [-0.80, -0.26,  0.18] },
+      { id: 'lab',     label: 'Real-time Lab',                 sub: 'Cerebellum · timing',       anchor: 'end',    pos: [-0.42, -0.30, -0.70] },
+      { id: 'contact', label: 'Contact',                       sub: 'Output',                    anchor: 'start',  pos: [ 0.48, -0.26, -0.68] }
     ];
     var COLORS = window.BH_COLORS || { about: '#b48cff', plugins: '#965aff', live: '#ff3b3b', work: '#f03040', visuals: '#f4f2fa', sound: '#2f6bff', lab: '#a066ff', contact: '#f2c94c' };
 
@@ -102,6 +103,7 @@
         throw new Error('bad brain mesh');
       }
       var use32 = u8[4] === 1;
+      var hasGroove = u8[5] === 1;
       var off = 8;
       var minx = dv.getFloat32(off, true), miny = dv.getFloat32(off + 4, true), minz = dv.getFloat32(off + 8, true);
       var maxx = dv.getFloat32(off + 12, true), maxy = dv.getFloat32(off + 16, true), maxz = dv.getFloat32(off + 20, true);
@@ -109,6 +111,7 @@
       var nverts = dv.getUint32(off, true), nidx = dv.getUint32(off + 4, true);
       off += 8;
       var pos = new Float32Array(nverts * 3), nrm = new Float32Array(nverts * 3);
+      var groove = new Float32Array(nverts);
       var ex = maxx - minx, ey = maxy - miny, ez = maxz - minz, i, q, s;
       for (i = 0; i < nverts; i++) {
         q = dv.getInt16(off, true); off += 2; pos[i * 3] = minx + (q + 32767) / 65534 * ex;
@@ -120,6 +123,9 @@
         s = dv.getInt8(off++); nrm[i * 3 + 1] = s / 127;
         s = dv.getInt8(off++); nrm[i * 3 + 2] = s / 127;
       }
+      if (hasGroove) {
+        for (i = 0; i < nverts; i++) groove[i] = u8[off++] / 255;
+      }
       var idx = new Uint32Array(nidx), src, j;
       if (use32) {
         for (j = 0; j < nidx; j++, off += 4) idx[j] = dv.getUint32(off, true);
@@ -129,6 +135,7 @@
       var geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+      geo.setAttribute('groove', new THREE.BufferAttribute(groove, 1));
       geo.setIndex(new THREE.BufferAttribute(idx, 1));
       geo.computeBoundingSphere();
       return geo;
@@ -217,7 +224,7 @@
 
     var group = new THREE.Group();
     group.position.y = 0.04;
-    group.scale.setScalar(1.08);
+    group.scale.setScalar(1.00);
     scene.add(group);
 
     // ---- Gray-Scott reaction-diffusion (same family as field.js), in this WebGL context ----
@@ -337,18 +344,20 @@
     // Clear glass: near-zero body, bright fresnel, sharp studio-window speculars (premultiplied so the rim is not a dark stroke)
     var glassMat = new THREE.ShaderMaterial({
       vertexShader: [
-        'varying vec3 vN; varying vec3 vV; varying vec3 vW;',
+        'attribute float groove;',
+        'varying vec3 vN; varying vec3 vV; varying vec3 vW; varying float vG;',
         'void main(){',
         '  vec4 w = modelMatrix * vec4(position,1.0);',
         '  vW = w.xyz;',
         '  vN = normalize(mat3(modelMatrix) * normal);',
         '  vV = cameraPosition - w.xyz;',
+        '  vG = groove;',
         '  gl_Position = projectionMatrix * viewMatrix * w;',
         '}'
       ].join('\n'),
       fragmentShader: [
         'precision highp float;',
-        'varying vec3 vN; varying vec3 vV; varying vec3 vW;',
+        'varying vec3 vN; varying vec3 vV; varying vec3 vW; varying float vG;',
         'float windowSpec(vec3 R, vec3 L, vec2 sz, float sharp){',
         '  vec3 up = abs(L.y) < 0.95 ? vec3(0.0,1.0,0.0) : vec3(1.0,0.0,0.0);',
         '  vec3 tu = normalize(cross(up, L));',
@@ -361,12 +370,14 @@
         'void main(){',
         '  vec3 N = normalize(vN);',
         '  vec3 V = normalize(vV);',
+        '  float g = smoothstep(0.12, 0.78, vG);',
         '  float fres = pow(1.0 - abs(dot(N, V)), 2.9);',
+        '  fres = min(1.0, fres + g * 0.50);',
         '  vec3 R = reflect(-V, N);',
         '  vec3 spec = vec3(0.0);',
-        '  spec += vec3(1.00, 0.98, 0.95) * windowSpec(R, normalize(vec3(-0.55, 0.78, 0.32)), vec2(0.11, 0.34), 16.0) * 1.15;',
-        '  spec += vec3(0.70, 0.84, 1.00) * windowSpec(R, normalize(vec3(0.72, 0.18, 0.28)), vec2(0.08, 0.24), 18.0) * 0.55;',
-        '  spec += vec3(1.00, 0.96, 0.90) * windowSpec(R, normalize(vec3(0.05, 0.96, 0.15)), vec2(0.42, 0.06), 24.0) * 0.45;',
+        '  spec += vec3(1.00, 0.98, 0.95) * windowSpec(R, normalize(vec3(-0.55, 0.78, 0.32)), vec2(0.16, 0.40), 8.0) * 0.85;',
+        '  spec += vec3(0.70, 0.84, 1.00) * windowSpec(R, normalize(vec3(0.72, 0.18, 0.28)), vec2(0.14, 0.30), 8.0) * 0.40;',
+        '  spec += vec3(1.00, 0.96, 0.90) * windowSpec(R, normalize(vec3(0.05, 0.96, 0.15)), vec2(0.50, 0.10), 10.0) * 0.32;',
         '  vec3 chroma = vec3(1.0, 0.22, 0.16) * pow(fres, 3.6) * 0.16 + vec3(0.18, 0.40, 1.0) * pow(fres, 3.0) * 0.20;',
         '  if (min(chroma.r, chroma.b) > chroma.g) {',
         '    if (chroma.r >= chroma.b) chroma.b = chroma.g; else chroma.r = chroma.g;',
@@ -374,7 +385,13 @@
         '  // premultiplied luminous rim (do not multiply the rim by alpha again — that made a black stroke)',
         '  float a = fres * 0.62 + min(0.55, length(spec) * 0.45);',
         '  vec3 col = vec3(0.93, 0.96, 1.0) * fres * 1.15 + chroma * fres + spec;',
-        '  gl_FragColor = vec4(col, clamp(a, 0.0, 0.75));',
+        '  // Readable fold lines: bright rim in the valleys, hemisphere-tinted neon off the midline (no magenta mix).',
+        '  vec3 gcol = vec3(0.93, 0.96, 1.0);',
+        '  if (vW.x < -0.10) gcol = vec3(1.00, 0.122, 0.239);',
+        '  else if (vW.x > 0.10) gcol = vec3(0.10, 0.36, 1.00);',
+        '  col += gcol * g * 0.70;',
+        '  a = min(a + g * 0.20, 0.82);',
+        '  gl_FragColor = vec4(col, clamp(a, 0.0, 0.78));',
         '}'
       ].join('\n'),
       transparent: true,
@@ -408,14 +425,14 @@
       'vec3 ramp(float x){',
       '  x = clamp(x, 0.0, 1.0);',
       '  vec3 C0=vec3(1.00,0.122,0.239);',
-      '  vec3 C1=vec3(0.95,0.06,0.12);',
+      '  vec3 C1=vec3(1.00,0.07,0.12);',
       '  vec3 C2=vec3(0.62,0.02,0.06);',
       '  vec3 C3=vec3(0.0);',
       '  vec3 C4=vec3(0.0);',
-      '  vec3 C5=vec3(0.30,0.10,0.78);',
-      '  vec3 C6=vec3(0.16,0.28,1.00);',
-      '  vec3 C7=vec3(0.10,0.38,1.00);',
-      '  float s0=0.0,s1=0.14,s2=0.28,s3=0.40,s4=0.58,s5=0.70,s6=0.86,s7=1.0;',
+      '  vec3 C5=vec3(0.04,0.28,1.00);',
+      '  vec3 C6=vec3(0.10,0.38,1.00);',
+      '  vec3 C7=vec3(0.14,0.46,1.00);',
+      '  float s0=0.0,s1=0.12,s2=0.24,s3=0.34,s4=0.62,s5=0.72,s6=0.86,s7=1.0;',
       '  vec3 a,b; float t,y1,y0;',
       '  if (x < s1) { a=C0; b=C1; y0=s0; y1=s1; }',
       '  else if (x < s2) { a=C1; b=C2; y0=s1; y1=s2; }',
@@ -596,7 +613,7 @@
       camera.updateProjectionMatrix();
       if (!shellGeo.boundingSphere) shellGeo.computeBoundingSphere();
       var R = shellGeo.boundingSphere.radius * group.scale.x;
-      var fill = 0.90; // occupy ~90% of the tighter canvas axis
+      var fill = 0.74; // moderate hero size — not looming
       var half = Math.tan((camera.fov * Math.PI / 180) * 0.5) * Math.min(1, camera.aspect);
       camDist = R / (fill * half);
       lookY = shellGeo.boundingSphere.center.y * group.scale.y + group.position.y;
@@ -692,8 +709,33 @@
         var z = (front ? 240 : 40) + Math.round((1 - v.z) * 80);
         if (hoverLock === m.region) z += 200;
         m.el.style.zIndex = String(z);
+        m.ndcZ = v.z;
         if (hoverLock === m.region) m.parked = true;
         else m.parked = false;
+      });
+      resolveLabelCollisions();
+    }
+
+    function boxesOverlap(a, b, pad) {
+      return a.x < b.x + b.width + pad && a.x + a.width + pad > b.x &&
+             a.y < b.y + b.height + pad && a.y + a.height + pad > b.y;
+    }
+
+    function resolveLabelCollisions() {
+      var vis = [];
+      markers.forEach(function (m) {
+        m.el.classList.remove('is-occluded');
+        if (m.el.classList.contains('is-back')) return;
+        var lab = m.el.querySelector('.node-label');
+        if (!lab) return;
+        vis.push({ m: m, r: lab.getBoundingClientRect(), z: m.ndcZ });
+      });
+      vis.sort(function (a, b) { return a.z - b.z; });
+      var kept = [];
+      vis.forEach(function (item) {
+        var hit = kept.some(function (k) { return boxesOverlap(k.r, item.r, 10); });
+        if (hit) item.m.el.classList.add('is-occluded');
+        else kept.push(item);
       });
     }
 
@@ -768,6 +810,30 @@
         renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '',
         vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : ''
       };
+    window.BH_brain3dSetPose = function (y, x) {
+      rotY = y;
+      if (x != null && x === x) rotX = x;
+      hoverLock = null;
+      markers.forEach(function (m) { m.parked = false; });
+    };
+    window.BH_brain3dGetLabels = function () {
+      return markers.map(function (m) {
+        var lab = m.el.querySelector('.node-label');
+        var r = lab ? lab.getBoundingClientRect() : null;
+        var back = m.el.classList.contains('is-back');
+        var occ = m.el.classList.contains('is-occluded');
+        return {
+          region: m.region,
+          label: m.def.label,
+          back: back,
+          occluded: occ,
+          visible: !back && !occ,
+          z: m.ndcZ,
+          box: r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null
+        };
+      });
+    };
+
     } catch (e) { window.BH_brain3dInfo = { err: String(e) }; }
     start();
   }
