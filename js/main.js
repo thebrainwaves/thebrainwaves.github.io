@@ -57,6 +57,15 @@
   });
 
   // lazy YouTube: thumbnail button -> privacy-enhanced (youtube-nocookie) iframe on click only
+  document.querySelectorAll('.yt[data-yt] img.yt-thumb').forEach(function (im) {
+    im.addEventListener('error', function () {
+      var box = im.closest('.yt');
+      var id = box && box.dataset.yt;
+      if (!id || im.dataset.fb) return;
+      im.dataset.fb = '1';
+      im.src = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+    });
+  });
   document.querySelectorAll('.yt[data-yt]').forEach(function (box) {
     var btn = box.querySelector('.yt-play'); if (!btn) return;
     btn.addEventListener('click', function () {

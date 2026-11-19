@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Brainhertz Productions — Visuals · Music · Animation · Los Angeles</title>
   <meta name="description" content="Brainhertz Productions: Los Angeles production camp led by producer and director Kyle Carlin. Visuals, music, animation, projection mapping, lighting design and live sound. Co-Chair of LASIGGRAPH.">
   <meta name="theme-color" content="#04050c">
+  <!-- HSTS cannot be set with a meta tag. GitHub Pages already serves this custom domain over HTTPS. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com; media-src 'self'; connect-src 'self'; font-src 'self'; frame-src https://www.youtube-nocookie.com https://open.spotify.com; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self' mailto:; upgrade-insecure-requests">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta property="og:title" content="Brainhertz Productions">
   <meta property="og:description" content="Producer and director. Visuals, music, projection mapping and lighting design. Los Angeles, since 2016.">
   <meta property="og:type" content="website">
@@ -25,10 +28,7 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/style.css">
-  <script>/* views (js/router.js): pick the view before first paint so deep links never flash the map */
-  (function (d) { d.classList.add('js'); var h = location.hash.slice(1), V = ['about','visuals','sound','artist','live','lab','work','plugins','contact'],
-    A = { lighting: 'live', direction: 'about', mosh: 'plugins', track: 'artist', 'music-video': 'artist' };
-    d.setAttribute('data-view', V.indexOf(h) > -1 ? h : (A[h] || 'home')); })(document.documentElement);</script>
+  <script src="js/view-boot.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -101,18 +101,21 @@
     <p class="lede">Producer &amp; director. Visuals, music, projection mapping and lighting design: one production camp, wired together.</p>
     <p class="credit-line"><span class="cl-mark" aria-hidden="true"></span><span>Immersive experiences · projection mapping · live sound</span></p>
     <a class="badge badge-link" href="https://lasiggraph.org/bio/presenter/carlin-kyle" rel="noopener" target="_blank" aria-label="Co-Chair, LASIGGRAPH: Kyle Carlin's bio on lasiggraph.org (opens in a new tab)"><span class="badge-dot" aria-hidden="true"></span>Co-Chair, LASIGGRAPH<svg class="ext-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-    <p class="hint" aria-hidden="true"><span class="hint-desktop">This brain is the site map. Hover a neuron to look inside; click it to go there.</span><span class="hint-mobile">This brain is the site map. Tap a neuron to go there.</span></p>
+    <p class="hint" aria-hidden="true"><span class="hint-desktop">This glass brain is the site map. Drag to turn it. Hover a neuron to look inside; click it to go there.</span><span class="hint-mobile">This glass brain is the site map. Drag to turn it. Tap a neuron to go there.</span></p>
   </div>
 
   <div class="brain-wrap">
+    <canvas class="brain3d" id="brain3d" aria-hidden="true" hidden></canvas>
+    <div class="brain3d-hotspots" id="brain3d-hotspots" hidden></div>
     <svg class="brain" id="brain" viewBox="0 0 1000 720" role="group" aria-labelledby="brain-title brain-desc">
       <title id="brain-title">Brainhertz Productions brain map</title>
-      <desc id="brain-desc">A clear glass brain. This is the site map. Each labelled region shows a preview on hover and goes to that part of the site on click: About, Plugins, Visuals, Music and Sound, Live, Projection and Lighting, Real-time Lab, Work and Contact.</desc>
+      <desc id="brain-desc">A three-dimensional clear glass brain. This is the site map. Each labelled region shows a preview on hover and goes to that part of the site on click: About, Plugins, Visuals, Music and Sound, Live, Projection and Lighting, Real-time Lab, Work and Contact.</desc>
       <defs>
-        <radialGradient id="g-glass" cx="38%" cy="32%" r="75%">
-          <stop offset="0" stop-color="#f4f0ff" stop-opacity=".16"/>
-          <stop offset=".55" stop-color="#ffffff" stop-opacity=".02"/>
-          <stop offset="1" stop-color="#ffffff" stop-opacity=".06"/>
+        <radialGradient id="g-glass" cx="32%" cy="26%" r="80%">
+          <stop offset="0" stop-color="#f7f5ff" stop-opacity=".08"/>
+          <stop offset=".42" stop-color="#d4e0ff" stop-opacity=".03"/>
+          <stop offset=".8" stop-color="#9eb8ff" stop-opacity=".07"/>
+          <stop offset="1" stop-color="#c8d8ff" stop-opacity=".18"/>
         </radialGradient>
         <linearGradient id="g-rim" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#b48cff"/>
@@ -131,22 +134,40 @@
           <feGaussianBlur stdDeviation="14"/>
         </filter>
         <clipPath id="clip-brain">
-          <use href="#shape-cerebrum"/><use href="#shape-cerebellum"/><use href="#shape-stem"/>
+          <use href="#shape-cerebrum"/><use href="#shape-cerebellum"/>
         </clipPath>
+        <mask id="mask-thickness" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="720">
+          <!-- white = original silhouette; black inset punches the cavity, leaving a back-face sliver -->
+          <use href="#shape-cerebellum" fill="white"/>
+          <use href="#shape-cerebrum" fill="white"/>
+          <g transform="translate(-7 -9)">
+            <use href="#shape-cerebellum" fill="black"/>
+            <use href="#shape-cerebrum" fill="black"/>
+          </g>
+        </mask>
         <path id="shape-cerebrum" d="M232 468C178 450 138 400 136 336C134 262 170 196 236 156C300 116 380 92 470 86C560 80 650 92 728 128C800 162 856 222 868 296C878 356 862 408 820 436C790 456 752 458 724 448C690 470 640 484 590 488C530 494 470 500 420 494C370 488 338 470 310 474C280 478 256 478 232 468Z"/>
         <path id="shape-cerebellum" d="M724 448C752 458 790 456 820 436C850 446 870 488 856 520C840 550 784 562 734 552C694 544 670 514 676 486C680 468 700 452 724 448Z"/>
-        <path id="shape-stem" d="M606 486C622 524 630 562 628 620C626 650 640 668 660 670C676 670 684 650 682 620C680 572 684 520 694 468C660 480 630 486 606 486Z"/>
-        <path id="rim-stem" d="M606 486C622 524 630 562 628 620C626 650 640 668 660 670C676 670 684 650 682 620C680 572 684 520 694 468"/>
       </defs>
 
       <!-- ambient back-glow -->
       <ellipse cx="500" cy="340" rx="360" ry="230" fill="#5a3dff" opacity=".05" filter="url(#f-soft)"/>
 
-      <!-- glass body -->
+      <!-- glass thickness: a clipped, offset back face so the shell reads as a thin vessel -->
+      <g class="glass-depth" mask="url(#mask-thickness)" aria-hidden="true">
+        <use href="#shape-cerebellum" class="glass-back"/>
+        <use href="#shape-cerebrum" class="glass-back"/>
+      </g>
+
+      <!-- glass body (clear coating; the field canvas shows through) -->
       <g class="glass">
-        <use href="#shape-stem" class="glass-fill"/>
         <use href="#shape-cerebellum" class="glass-fill"/>
         <use href="#shape-cerebrum" class="glass-fill"/>
+      </g>
+
+      <!-- inner wall of the shell, clipped so only the inside of a wide stroke remains -->
+      <g class="glass-wall" clip-path="url(#clip-brain)" fill="none" aria-hidden="true">
+        <use href="#shape-cerebellum" class="glass-inner"/>
+        <use href="#shape-cerebrum" class="glass-inner"/>
       </g>
 
       <!-- region glows (lit on hover/focus) -->
@@ -172,12 +193,12 @@
       <g class="rim" fill="none">
         <use href="#shape-cerebrum" class="rim-glow" filter="url(#f-glow)"/>
         <use href="#shape-cerebellum" class="rim-glow" filter="url(#f-glow)"/>
-        <use href="#rim-stem" class="rim-glow" filter="url(#f-glow)"/>
         <use href="#shape-cerebrum" class="rim-line"/>
         <use href="#shape-cerebellum" class="rim-line"/>
-        <use href="#rim-stem" class="rim-line"/>
         <path class="specular" d="M206 214C250 164 330 124 420 108"/>
         <path class="specular s2" d="M170 330C168 300 176 272 190 250"/>
+        <path class="specular s3" d="M740 200C780 180 830 200 850 250"/>
+        <path class="specular s4" d="M620 520C628 560 632 610 630 650"/>
       </g>
 
       <!-- neuron network (generated) -->
@@ -217,9 +238,9 @@
           <circle class="node-halo" r="30"/><circle class="node-ring" r="15"/><circle class="node-core" r="6"/>
           <text class="node-label"><tspan class="nl-main">Real-time Lab</tspan><tspan class="nl-sub" dy="20">Cerebellum · timing</tspan></text>
         </a>
-        <a href="#contact" class="node" data-region="contact" data-x="656" data-y="630" data-lx="42" data-ly="4" data-anchor="start">
+        <a href="#contact" class="node" data-region="contact" data-x="742" data-y="548" data-lx="36" data-ly="18" data-anchor="start">
           <circle class="node-halo" r="30"/><circle class="node-ring" r="15"/><circle class="node-core" r="6"/>
-          <text class="node-label"><tspan class="nl-main">Contact</tspan><tspan class="nl-sub" dy="20">Brainstem · output</tspan></text>
+          <text class="node-label"><tspan class="nl-main">Contact</tspan><tspan class="nl-sub" dy="20">Output</tspan></text>
         </a>
       </g>
     </svg>
@@ -232,7 +253,7 @@
     </div>
 
     <!-- the neuron "cell": preview of what's inside a region -->
-    <div class="cell" id="cell" role="dialog" aria-modal="false" aria-labelledby="cell-title" hidden>
+    <div class="cell" id="cell" role="dialog" aria-modal="false" aria-labelledby="cell-title-about" hidden>
       <span class="cell-membrane" aria-hidden="true"></span>
       <button class="cell-close" type="button" aria-label="Close preview">&times;</button>
       <div class="cell-body" id="cell-body"></div>
@@ -243,21 +264,21 @@
   <!-- neuron contents -->
   <template id="tpl-about">
     <p class="cell-lobe">Frontal lobe · identity</p>
-    <h3 id="cell-title">About</h3>
+    <h3 id="cell-title-about">About</h3>
     <p>Kyle Carlin is a Los Angeles producer and director who has run Brainhertz Productions since 2016: visuals, music, animation, projection mapping, lighting design and live sound, all from one studio.</p>
     <p>He loves helping a crew pull a show together, makes music as Tellavi5ion, and gives his MOSH plugin away for free.</p>
     <ul class="cell-chips links"><li><a href="https://lasiggraph.org/bio/presenter/carlin-kyle" rel="noopener" target="_blank">Co-Chair, LASIGGRAPH</a></li><li>Los Angeles, CA</li><li>Since 2016</li></ul>
   </template>
   <template id="tpl-plugins">
     <p class="cell-lobe">Motor cortex · tools</p>
-    <h3 id="cell-title">Plugins</h3>
+    <h3 id="cell-title-plugins">Plugins</h3>
     <div class="cell-plugins">
       <div class="cell-plugin real"><img class="cp-thumb" src="assets/plugins/mosh-preview-thumb.webp" alt="MOSH datamosh effect running in Resolume" width="320" height="180"><strong>MOSH</strong><span class="cp-plat">Resolume FFGL · Windows 64-bit</span><span class="cp-desc">Reaction-diffusion datamosh effect for Resolume Arena / Avenue 7.0.3 to 7.2.x.</span><a class="cp-dl" href="assets/plugins/MOSH-resolume-7.2.zip" download>Download .zip</a></div>
     </div>
   </template>
   <template id="tpl-visuals">
     <p class="cell-lobe">Occipital lobe · sight</p>
-    <h3 id="cell-title">Visuals &amp; Animation</h3>
+    <h3 id="cell-title-visuals">Visuals &amp; Animation</h3>
     <div class="cell-thumbs t3">
       <img src="assets/work/render-02.jpg" alt="3D render: green and violet angular panels around a magenta sphere">
       <img src="assets/work/render-05.jpg" alt="3D render: iridescent pink and blue star shape">
@@ -267,7 +288,7 @@
   </template>
   <template id="tpl-sound">
     <p class="cell-lobe">Temporal lobe · hearing</p>
-    <h3 id="cell-title">Music &amp; Sound</h3>
+    <h3 id="cell-title-sound">Music &amp; Sound</h3>
     <div class="cell-feat">
       <p class="cf-k"><span class="cf-new">New single</span>Tellavi5ion</p>
       <p class="cf-title">ICHANNEL2</p>
@@ -294,7 +315,7 @@
   </template>
   <template id="tpl-live">
     <p class="cell-lobe">Parietal lobe · space</p>
-    <h3 id="cell-title">Live, Projection &amp; Lighting</h3>
+    <h3 id="cell-title-live">Live, Projection &amp; Lighting</h3>
     <ul class="cell-list">
       <li><span class="cl-dot"></span><span><b>Immersive &amp; VR</b><small>an early fully immersive experience · VR tech for a major LA tour</small></span></li>
       <li><span class="cl-dot"></span><span><b>NEXT LEVEL: One Love Pre-Party</b><small>Oct 7, 2017 · Fais Do Do, Los Angeles · projections</small></span></li>
@@ -305,13 +326,13 @@
   </template>
   <template id="tpl-lab">
     <p class="cell-lobe">Cerebellum · timing</p>
-    <h3 id="cell-title">Real-time Lab</h3>
+    <h3 id="cell-title-lab">Real-time Lab</h3>
     <p><b>Tellavi5ion</b>: a generative music and visual system for real-time performance, combining generative music, real-time visuals and immersive lighting.</p>
     <ul class="cell-chips"><li>Ableton</li><li>Unreal Engine</li><li>Open to collaborators</li></ul>
   </template>
   <template id="tpl-work">
     <p class="cell-lobe">Hippocampus · memory</p>
-    <h3 id="cell-title">Work</h3>
+    <h3 id="cell-title-work">Work</h3>
     <div class="cell-thumbs t4">
       <img src="assets/work/render-06.jpg" alt="3D render: white cubes radiating from a dark red core">
       <img src="assets/work/render-03.jpg" alt="3D render: dark geodesic sphere">
@@ -321,8 +342,8 @@
     <p>Render stills from the 2017 archive, plus selected live and event credits.</p>
   </template>
   <template id="tpl-contact">
-    <p class="cell-lobe">Brainstem · output</p>
-    <h3 id="cell-title">Contact</h3>
+    <p class="cell-lobe">Output</p>
+    <h3 id="cell-title-contact">Contact</h3>
     <p><a class="cell-mail" href="mailto:brainhertzproductions@gmail.com">brainhertzproductions@gmail.com</a></p>
     <ul class="cell-chips links">
       <li><a href="https://www.instagram.com/tellavi5ion/" rel="noopener" target="_blank">Instagram</a></li>
@@ -342,7 +363,7 @@
       <li><a href="#lab" data-region="lab"><span class="c-dot"></span><span class="c-main">Real-time Lab</span><span class="c-sub">Cerebellum · timing</span></a></li>
       <li><a href="#work" data-region="work"><span class="c-dot"></span><span class="c-main">Work</span><span class="c-sub">Hippocampus · memory</span></a></li>
       <li><a href="#plugins" data-region="plugins"><span class="c-dot"></span><span class="c-main">Plugins</span><span class="c-sub">Motor cortex · tools</span></a></li>
-      <li><a href="#contact" data-region="contact"><span class="c-dot"></span><span class="c-main">Contact</span><span class="c-sub">Brainstem · output</span></a></li>
+      <li><a href="#contact" data-region="contact"><span class="c-dot"></span><span class="c-main">Contact</span><span class="c-sub">Output</span></a></li>
     </ol>
   </nav>
 </section>
@@ -425,7 +446,7 @@
       </p>
     </div>
     <div class="fr-player">
-      <div class="sp-embed fr-embed sp-gate" data-sp="https://open.spotify.com/embed/album/369DozWzfZtHWWhbTBDpkk?utm_source=generator&amp;theme=0" data-title="ICHANNEL2 by Tellavi5ion on Spotify" data-h="232" style="min-height:232px"><button type="button" class="sp-load" aria-label="Load ICHANNEL2 by Tellavi5ion on Spotify (loads Spotify)">Load Spotify player</button><small class="sp-note">Loading the player connects to Spotify, which may set cookies. See our <a href="privacy.html">privacy policy</a>.</small></div>
+      <div class="sp-embed fr-embed sp-gate" data-sp="https://open.spotify.com/embed/album/369DozWzfZtHWWhbTBDpkk?utm_source=generator&amp;theme=0" data-title="ICHANNEL2 by Tellavi5ion on Spotify" data-h="232"><button type="button" class="sp-load" aria-label="Load ICHANNEL2 by Tellavi5ion on Spotify (loads Spotify)">Load Spotify player</button><small class="sp-note">Loading the player connects to Spotify, which may set cookies. See our <a href="privacy.html">privacy policy</a>.</small></div>
       <p class="sp-note">Player by Spotify. Loads when you open this page.</p>
     </div>
   </article>
@@ -513,7 +534,7 @@
     </div>
 
     <aside class="artist-player" aria-label="Spotify player">
-      <div class="sp-embed sp-gate" data-sp="https://open.spotify.com/embed/artist/4AjMERXHZa0elWZe2X655o?utm_source=generator&amp;theme=0" data-title="Tellavi5ion on Spotify" data-h="452" style="min-height:452px"><button type="button" class="sp-load" aria-label="Load Tellavi5ion on Spotify (loads Spotify)">Load Spotify player</button><small class="sp-note">Loading the player connects to Spotify, which may set cookies. See our <a href="privacy.html">privacy policy</a>.</small></div>
+      <div class="sp-embed sp-gate" data-sp="https://open.spotify.com/embed/artist/4AjMERXHZa0elWZe2X655o?utm_source=generator&amp;theme=0" data-title="Tellavi5ion on Spotify" data-h="452"><button type="button" class="sp-load" aria-label="Load Tellavi5ion on Spotify (loads Spotify)">Load Spotify player</button><small class="sp-note">Loading the player connects to Spotify, which may set cookies. See our <a href="privacy.html">privacy policy</a>.</small></div>
       <p class="sp-note">Player by Spotify. Loads when you open this page.</p>
     </aside>
   </div>
@@ -525,7 +546,7 @@
     </div>
     <div class="yt" data-yt="cM_DXsSSW5w" data-title="Jumanji ft Westside Boogie &amp; C4 - Energy Remix (music video)">
       <button type="button" class="yt-play" aria-label="Play the music video: Jumanji ft Westside Boogie &amp; C4 - Energy Remix (loads YouTube)">
-        <img class="yt-thumb" src="https://i.ytimg.com/vi_webp/cM_DXsSSW5w/maxresdefault.webp" alt="" width="1280" height="720" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/cM_DXsSSW5w/hqdefault.jpg'">
+        <img class="yt-thumb" src="https://i.ytimg.com/vi_webp/cM_DXsSSW5w/maxresdefault.webp" alt="" width="1280" height="720" loading="lazy" decoding="async">
         <span class="yt-btn" aria-hidden="true"><svg viewBox="0 0 68 48"><path class="yt-bg" d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.2.3 34 .3 34 .3s-21.2 0-26.5 1.4a8.5 8.5 0 0 0-6 6C.1 13 .1 24 .1 24s0 11 1.4 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C67.9 35 67.9 24 67.9 24s0-11-1.4-16.3z"/><path class="yt-tri" d="M45 24 27 14v20z"/></svg></span>
         <span class="yt-hint">Click to load the video · youtube-nocookie.com</span>
       </button>
@@ -714,7 +735,7 @@
 <!-- ============ CONTACT ============ -->
 <section class="section view contact" id="contact" data-title="Contact" aria-labelledby="contact-title">
   <header class="sec-head">
-    <p class="region-tag"><span class="rt-dot"></span>Brainstem · Contact</p>
+    <p class="region-tag"><span class="rt-dot"></span>Contact</p>
     <h2 id="contact-title">Send a <span class="grad">signal</span></h2>
     <p class="sec-sub">Visuals for a show, a projection-mapping build, animation, music, or a collaboration on Tellavi5ion.</p>
   </header>
@@ -741,7 +762,7 @@
 </footer>
 
 <!-- symbol sprite -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<svg class="symbol-sprite" width="0" height="0" aria-hidden="true">
   <symbol id="glyph-brain" viewBox="0 0 32 32">
     <path d="M7 19c-2.5-.6-4-2.8-4-5.4 0-3.9 3.6-7.7 9-8.6 4.4-.8 9.3-.2 12.4 2.3 2.4 2 3.3 4.6 2.8 7-.4 2-1.8 3.3-3.6 3.5-1.6 1.2-4 1.7-6.6 1.8-2.6.1-4.8-.6-6.6-.2C9 19.6 8 19.4 7 19Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
     <path d="M18 20.5c.6 2 .8 4 .6 6.3M8 12.5l4.5 2 4-4.5 4 3.5 4.5-1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -762,5 +783,6 @@
 <script src="js/audio.js" defer></script>
 <script src="js/router.js" defer></script>
 <script src="js/hero3d.js" defer></script>
+<script src="js/brain3d.js" defer></script>
 </body>
 </html>

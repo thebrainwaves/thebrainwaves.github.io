@@ -1,6 +1,7 @@
 /* Brainhertz: living multicolour reaction-diffusion field (Gray-Scott, like Kyle's MOSH plugin).
-   One low-res simulation, ping-ponged on the GPU (WebGL2) and upscaled. It is drawn bright and clipped to the glass
-   brain, and soft/dark behind the rest of the hero. Colour = ramp red > signal red > deep red > near-black > deep purple > purple > deep blue
+   One low-res simulation, ping-ponged on the GPU (WebGL2) and upscaled. The field lives INSIDE a clear glass shell:
+   the display shader refracts the pattern at the rim, adds a fresnel highlight and a thin thickness cue, and keeps a
+   soft/dark wash behind the rest of the hero. Clipped to the brain silhouette. Colour = ramp red > signal red > deep red > near-black > deep purple > purple > deep blue
    (ping-pong; red reaches purple only through a near-black step, so no pink; the reds lean a touch orange because the brain's purple glass sits on top of this canvas), driven by concentration plus a slow hue drift.
    At rest: occasional small macroblock / slice-smear moshes (applied to the sim itself, so the scars evolve).
    Flares (js/flare.js) perturb feed/kill, re-seed and spike saturation. While the track plays, bass does the same (js/audio.js).
@@ -15,7 +16,12 @@
   cv.className = 'field'; cv.setAttribute('aria-hidden', 'true');
   hero.insertBefore(cv, hero.firstChild);
   var RAMP = [[255, 90, 40], [240, 44, 30], [170, 18, 12], [18, 8, 16], [96, 30, 200], [150, 60, 255], [52, 82, 230]];
-  var DISPLAY_SCALE = 0.5, SIM_MAX = 300;
+  var SIM_MAX = 300;
+  function displayScale() {
+    // Cap CSS-pixel backing store so the display pass stays cheap on a 2x phone (sim is already low-res).
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    return Math.max(0.5, Math.min(0.62, 0.5 * dpr));
+  }
   var flare = 0, drive = 0, driveSim = 0, glitch = 0, gband = [0, 0, 0, 0], nextGlitch = performance.now() + 2500;
 
   // ---------- brain mask (R = inside silhouette, G = dark halo under nodes/labels) ----------
@@ -23,12 +29,12 @@
   var brainUV = [0, 0, 1, 1];
   function vb() { var b = svg.viewBox.baseVal; return [b.x, b.y, b.width, b.height]; }
   function drawMask() {
-    var v = vb(), mc = mask.getContext('2d');
+    var v = vb(), mc = mask.getContext('2d', { willReadFrequently: true });
     MH = Math.round(MW * v[3] / v[2]); mask.height = MH;
     mc.clearRect(0, 0, MW, MH);
     mc.save(); mc.scale(MW / v[2], MH / v[3]); mc.translate(-v[0], -v[1]);
-    mc.filter = 'blur(2px)'; mc.fillStyle = '#f00';
-    ['shape-cerebrum', 'shape-cerebellum', 'shape-stem'].forEach(function (id) { var p = document.getElementById(id); if (p) mc.fill(new Path2D(p.getAttribute('d'))); });
+    mc.filter = 'blur(1.5px)'; mc.fillStyle = '#f00';
+    ['shape-cerebrum', 'shape-cerebellum'].forEach(function (id) { var p = document.getElementById(id); if (p) mc.fill(new Path2D(p.getAttribute('d'))); });
     mc.filter = 'none'; mc.globalCompositeOperation = 'lighter';
     svg.querySelectorAll('.node').forEach(function (n) {
       var x = +n.dataset.x, y = +n.dataset.y, g = mc.createRadialGradient(x, y, 0, x, y, 46);
@@ -41,6 +47,16 @@
       }
     });
     mc.restore();
+    // B channel: a wider blur of the silhouette, used as a cheap SDF for glass fresnel / thickness
+    var soft = document.createElement('canvas'); soft.width = MW; soft.height = MH;
+    var sx = soft.getContext('2d');
+    sx.save(); sx.scale(MW / v[2], MH / v[3]); sx.translate(-v[0], -v[1]);
+    sx.filter = 'blur(12px)'; sx.fillStyle = '#fff';
+    ['shape-cerebrum', 'shape-cerebellum'].forEach(function (id) { var p = document.getElementById(id); if (p) sx.fill(new Path2D(p.getAttribute('d'))); });
+    sx.restore();
+    var sharp = mc.getImageData(0, 0, MW, MH), blur = sx.getImageData(0, 0, MW, MH);
+    for (var i = 0; i < sharp.data.length; i += 4) sharp.data[i + 2] = blur.data[i];
+    mc.putImageData(sharp, 0, 0);
   }
   function measure() {
     var hr = cv.getBoundingClientRect(), br = svg.getBoundingClientRect();
@@ -69,24 +85,50 @@
       'float h(vec2 q){return fract(sin(dot(q,vec2(127.1,311.7))+seed)*43758.5453);}' +
       'void main(){vec2 q=uv;if(uv.y>band.x&&uv.y<band.y)q.x-=band.z;vec2 bl=floor(uv*vec2(20.,12.));' +
       'if(h(bl)<amt){q+=(vec2(h(bl+1.),h(bl+2.))-.5)*.05;}o=texture(s,q);}';
-    var DISP = '#version 300 es\nprecision highp float;uniform sampler2D s,m;uniform vec4 brain,gb;uniform float t,fl,gl;uniform vec2 res;in vec2 uv;out vec4 o;\n' +
-      'vec3 C[7]=vec3[7](vec3(1.,0.353,0.157),vec3(0.941,0.173,0.118),vec3(0.667,0.071,0.047),vec3(0.071,0.031,0.063),vec3(0.376,0.118,0.784),vec3(0.588,0.235,1.),vec3(0.204,0.322,0.902));' +
-      'vec3 ramp(float x){x=clamp(x,0.,1.)*6.;int i=int(min(floor(x),5.));return mix(C[i],C[i+1],x-float(i));}' +
-      'float h(vec2 q){return fract(sin(dot(q,vec2(12.9898,78.233))+gb.w)*43758.5453);}' +
-      'void main(){vec2 sc=vec2(uv.x,1.-uv.y);vec2 q=sc;' +
-      'if(gl>0.){if(sc.y>gb.x&&sc.y<gb.y)q.x-=gb.z*gl;vec2 bl=floor(sc*res/28.);if(h(bl)<.035*gl)q+=(vec2(h(bl+3.),h(bl+7.))-.5)*.06;}' +
-      'vec2 c=texture(s,vec2(q.x,1.-q.y)).xy;float b=c.y;' +
-      'float hh=fract(b*3.2+t*.02+q.x*.95+q.y*.45+.08*sin(q.y*9.+t*.3));vec3 col=ramp(1.-abs(2.*hh-1.));' +
-      'float lum=smoothstep(.07,.40,b);float edge=smoothstep(.18,.26,b)-smoothstep(.30,.42,b);' +
-      'vec2 bu=(sc-brain.xy)/brain.zw;vec2 mk=(bu.x>0.&&bu.x<1.&&bu.y>0.&&bu.y<1.)?texture(m,bu).rg:vec2(0.);' +
-      'vec2 bd=max(max(brain.xy-sc,sc-(brain.xy+brain.zw)),0.);float prox=1.-.62*smoothstep(0.,.32,length(bd*vec2(res.x/res.y,1.)));' +
-      'float bgf=smoothstep(0.,.08,sc.x)*smoothstep(1.,.92,sc.x)*smoothstep(1.,.85,sc.y)*prox;' +
-      'float inten=mix(.15*bgf,.92,mk.r)*(1.-.72*mk.g)*(1.+.45*fl*mix(.35,1.,mk.r));' +
-      'col=col*(lum*.85+edge*.35)*inten;' +
-      'float g=dot(col,vec3(.3,.59,.11));col=max(mix(vec3(g),col,1.+.7*fl),0.);' +
-      // pink guard: purple stays (hue up to ~276), anything between purple and red is pulled back to violet or red; reds drop their blue and are drawn fully opaque (dim red edges become a near-black step) so the purple glass behind can't tint them pink
-      'if(col.r>col.g&&col.b>col.g){if(col.b>=col.r)col.r=min(col.r,col.g+.6*(col.b-col.g));else col.b=min(col.b,col.g);}' +
-      'float wm=smoothstep(.12,.35,(col.r-max(col.g,col.b))/(col.r+.015));o=vec4(col,mix(clamp(max(col.r,max(col.g,col.b))*1.1,0.,1.),1.,wm));}';
+    var DISP = [
+      '#version 300 es',
+      'precision highp float;',
+      'uniform sampler2D s,m;uniform vec4 brain,gb;uniform float t,fl,gl;uniform vec2 res;in vec2 uv;out vec4 o;',
+      'vec3 C[7]=vec3[7](vec3(1.,0.353,0.157),vec3(0.941,0.173,0.118),vec3(0.667,0.071,0.047),vec3(0.071,0.031,0.063),vec3(0.376,0.118,0.784),vec3(0.588,0.235,1.),vec3(0.204,0.322,0.902));',
+      'vec3 ramp(float x){x=clamp(x,0.,1.)*6.;int i=int(min(floor(x),5.));return mix(C[i],C[i+1],x-float(i));}',
+      'float h(vec2 q){return fract(sin(dot(q,vec2(12.9898,78.233))+gb.w)*43758.5453);}',
+      'void main(){',
+      '  vec2 sc=vec2(uv.x,1.-uv.y);vec2 q=sc;',
+      '  if(gl>0.){if(sc.y>gb.x&&sc.y<gb.y)q.x-=gb.z*gl;vec2 bl=floor(sc*res/28.);if(h(bl)<.035*gl)q+=(vec2(h(bl+3.),h(bl+7.))-.5)*.06;}',
+      '  vec2 bu=(sc-brain.xy)/brain.zw;',
+      '  vec4 mm=vec4(0.);',
+      '  if(bu.x>0.&&bu.x<1.&&bu.y>0.&&bu.y<1.) mm=texture(m,bu);',
+      '  float inside=mm.r, soft=mm.b, lab=mm.g;',
+      '  vec2 texel=1./vec2(textureSize(m,0));',
+      '  float sx=0.,sy=0.;',
+      '  if(inside>0.001||soft>0.001){',
+      '    sx=texture(m,bu+vec2(texel.x*2.,0.)).b-texture(m,bu-vec2(texel.x*2.,0.)).b;',
+      '    sy=texture(m,bu+vec2(0.,texel.y*2.)).b-texture(m,bu-vec2(0.,texel.y*2.)).b;',
+      '  }',
+      '  vec2 nrm=normalize(vec2(-sx,-sy)+1e-5);',
+      '  float fres=clamp((1.-soft)*1.2,0.,1.)*smoothstep(0.02,0.4,max(inside,soft));',
+      '  vec2 qRef=q-nrm*fres*0.04;',
+      '  vec2 c=texture(s,vec2(qRef.x,1.-qRef.y)).xy;float b=c.y;',
+      '  float hh=fract(b*3.2+t*.02+qRef.x*.95+qRef.y*.45+.08*sin(qRef.y*9.+t*.3));vec3 col=ramp(1.-abs(2.*hh-1.));',
+      '  float lum=smoothstep(.07,.40,b);float edge=smoothstep(.18,.26,b)-smoothstep(.30,.42,b);',
+      '  vec2 bd=max(max(brain.xy-sc,sc-(brain.xy+brain.zw)),0.);',
+      '  float prox=1.-.62*smoothstep(0.,.32,length(bd*vec2(res.x/res.y,1.)));',
+      '  float bgf=smoothstep(0.,.08,sc.x)*smoothstep(1.,.92,sc.x)*smoothstep(1.,.85,sc.y)*prox;',
+      '  float inten=mix(.11*bgf,.90,inside)*(1.-.72*lab)*(1.+.45*fl*mix(.35,1.,inside));',
+      '  col=col*(lum*.85+edge*.35)*inten*mix(1.,.40,pow(fres,1.05));',
+      '  col+=vec3(0.62,0.72,1.0)*fres*inside*0.22;',
+      '  float spec=pow(max(0.,dot(nrm,normalize(vec2(-0.42,0.88)))),24.)*inside;',
+      '  col+=vec3(0.93,0.96,1.0)*spec*0.72;',
+      '  float rimL=pow(max(0.,dot(nrm,normalize(vec2(0.82,-0.12)))),7.)*inside*fres;',
+      '  col+=vec3(0.18,0.38,0.98)*rimL*0.30;',
+      '  float g=dot(col,vec3(.3,.59,.11));col=max(mix(vec3(g),col,1.+.7*fl),0.);',
+      '  if(col.r>col.g&&col.b>col.g){if(col.b>=col.r)col.r=min(col.r,col.g+.6*(col.b-col.g));else col.b=min(col.b,col.g);}',
+      '  float wm=smoothstep(.12,.35,(col.r-max(col.g,col.b))/(col.r+.015));',
+      '  float alpha=mix(clamp(max(col.r,max(col.g,col.b))*1.1,0.,1.),1.,wm);',
+      '  alpha=max(alpha,inside*fres*0.35+spec*0.4);',
+      '  o=vec4(col,alpha);',
+      '}',
+    ].join('\n');
     function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
     function prog(fs) { var p = gl.createProgram(), v = sh(gl.VERTEX_SHADER, VS), f = sh(gl.FRAGMENT_SHADER, fs); if (!v || !f) return null; gl.attachShader(p, v); gl.attachShader(p, f); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) return null; var u = {}; var n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (var i = 0; i < n; i++) { var a = gl.getActiveUniform(p, i); u[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); } return { p: p, u: u }; }
     var pSim = prog(SIM), pMosh = prog(MOSH), pDisp = prog(DISP);
@@ -112,7 +154,7 @@
       return d;
     }
     function resize(hr) {
-      var w = Math.max(2, Math.round(hr.width * DISPLAY_SCALE)), h = Math.max(2, Math.round(hr.height * DISPLAY_SCALE));
+      var w = Math.max(2, Math.round(hr.width * displayScale())), h = Math.max(2, Math.round(hr.height * displayScale()));
       cv.width = w; cv.height = h;
       var s = Math.min(1, SIM_MAX / Math.max(hr.width / 4, hr.height / 4));
       var nw = Math.round(hr.width / 4 * s), nh = Math.round(hr.height / 4 * s);
@@ -166,7 +208,7 @@
     var ctx = cv.getContext('2d'); if (!ctx) return null;
     var sim = document.createElement('canvas'), sc = sim.getContext('2d'), W = 0, H = 0, A, B, A2, B2, img, t = 0;
     function resize(hr) {
-      cv.width = Math.round(hr.width * DISPLAY_SCALE); cv.height = Math.round(hr.height * DISPLAY_SCALE);
+      cv.width = Math.round(hr.width * displayScale()); cv.height = Math.round(hr.height * displayScale());
       var s = Math.min(1, 140 / Math.max(hr.width / 6, hr.height / 6));
       W = Math.round(hr.width / 6 * s); H = Math.round(hr.height / 6 * s); sim.width = W; sim.height = H;
       A = new Float32Array(W * H).fill(1); B = new Float32Array(W * H); A2 = new Float32Array(W * H); B2 = new Float32Array(W * H); img = sc.createImageData(W, H);
@@ -196,10 +238,20 @@
     }
     function draw(now) {
       var w = cv.width, h = cv.height; ctx.clearRect(0, 0, w, h); colorize(now, 1 + .4 * drive);
-      ctx.imageSmoothingEnabled = true; ctx.globalAlpha = .17; ctx.drawImage(sim, 0, 0, w, h); ctx.globalAlpha = 1;
+      ctx.imageSmoothingEnabled = true; ctx.globalAlpha = .14; ctx.drawImage(sim, 0, 0, w, h); ctx.globalAlpha = 1;
       var v = vb(); ctx.save(); ctx.translate(brainUV[0] * w, brainUV[1] * h); ctx.scale(brainUV[2] * w / v[2], brainUV[3] * h / v[3]); ctx.translate(-v[0], -v[1]);
-      var p = new Path2D(); ['shape-cerebrum', 'shape-cerebellum', 'shape-stem'].forEach(function (id) { var e = document.getElementById(id); if (e) p.addPath(new Path2D(e.getAttribute('d'))); });
-      ctx.clip(p); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = .9; ctx.drawImage(sim, 0, 0, w, h); ctx.restore();
+      var p = new Path2D(); ['shape-cerebrum', 'shape-cerebellum'].forEach(function (id) { var e = document.getElementById(id); if (e) p.addPath(new Path2D(e.getAttribute('d'))); });
+      ctx.save(); ctx.clip(p);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = .9; ctx.drawImage(sim, -3, -2, w + 6, h + 5);
+      ctx.restore();
+      // inner glass wall + thin highlight, still in brain space
+      ctx.clip(p);
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(10,16,36,0.45)'; ctx.lineWidth = 14; ctx.stroke(p);
+      ctx.strokeStyle = 'rgba(200,220,255,0.4)'; ctx.lineWidth = 7; ctx.stroke(p);
+      ctx.strokeStyle = 'rgba(244,248,255,0.55)'; ctx.lineWidth = 2.2; ctx.stroke(p);
+      ctx.restore();
     }
     return { resize: resize, step: function (n) { step(Math.min(n, 2)); }, draw: draw, mosh: function () {}, seed: function (x, y) { var cx = Math.floor(x * W), cy = Math.floor(y * H); for (var yy = -2; yy <= 2; yy++) for (var xx = -2; xx <= 2; xx++) B[((cy + yy + H) % H) * W + (cx + xx + W) % W] = 1; }, kind: '2d' };
   }
@@ -243,6 +295,11 @@
     }
     if (now - seedT > 1400) { seedT = now; F.seed(Math.random(), Math.random(), 2.5); }
     if (Math.random() < .02) measure();
+    // when the 3D glass brain is running it is the hero; pause this sim so the phone GPU is not driving two WebGL contexts
+    if (document.documentElement.dataset.brain3d === 'on') {
+      if (visible && !document.hidden) raf = requestAnimationFrame(frame);
+      return;
+    }
     F.step(8 + Math.round(ab * 4));
     F.draw(now);
     if (visible && !document.hidden) raf = requestAnimationFrame(frame);

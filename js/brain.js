@@ -62,7 +62,7 @@
 
   // tighter framing on small screens (labels are hidden there; the chain nav takes over)
   var mq = window.matchMedia('(max-width: 720px)');
-  function frameBrain() { svg.setAttribute('viewBox', mq.matches ? '118 70 770 620' : '0 0 1000 720'); }
+  function frameBrain() { svg.setAttribute('viewBox', mq.matches ? '130 70 760 520' : '40 50 920 560'); }
   frameBrain(); mq.addEventListener && mq.addEventListener('change', frameBrain);
 
   // ---------- region nodes ----------
@@ -220,6 +220,7 @@
     if (t.classList.contains('disc')) { t.classList.add('flash'); setTimeout(function () { t.classList.remove('flash'); }, 1800); }
   }
   window.BH_go = go;
+  window.BH_fireAndGo = fireAndGo;
   function heroVisible() { var r = svg.getBoundingClientRect(); return r.bottom > 80 && r.top < window.innerHeight; }
   function fireAndGo(region) {
     if (reduce.matches || !heroVisible()) { go(region); return; }
@@ -287,6 +288,7 @@
     if (!same) {
       var tpl = document.getElementById('tpl-' + r); if (!tpl) return;
       body.innerHTML = ''; body.appendChild(tpl.content.cloneNode(true));
+      var heading = body.querySelector('h3[id^="cell-title"]'); if (heading) cell.setAttribute('aria-labelledby', heading.id);
       var act = document.createElement('div'); act.className = 'cell-actions';
       var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'cell-go';
       btn.innerHTML = 'Go to ' + labelOf(r).replace(/&/g, '&amp;') + ' <span aria-hidden="true">&rarr;</span>';
