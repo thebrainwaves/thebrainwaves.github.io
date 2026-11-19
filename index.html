@@ -28,6 +28,8 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="preload" as="image" href="assets/brain-poster.avif" type="image/avif" media="(min-width: 721px)">
+  <link rel="preload" as="image" href="assets/brain-poster-phone.avif" type="image/avif" media="(max-width: 720px)">
   <script src="js/view-boot.js"></script>
 </head>
 <body>
@@ -105,9 +107,27 @@
   </div>
 
   <div class="brain-wrap">
+    <div class="brain-stage">
+    <picture class="brain-poster-pic">
+      <source media="(max-width: 720px)" type="image/avif" srcset="assets/brain-poster-phone.avif">
+      <source media="(max-width: 720px)" type="image/webp" srcset="assets/brain-poster-phone.webp">
+      <source type="image/avif" srcset="assets/brain-poster.avif">
+      <source type="image/webp" srcset="assets/brain-poster.webp">
+      <img class="brain-poster" src="assets/brain-poster.webp" width="960" height="584" alt="" decoding="sync" fetchpriority="high">
+    </picture>
     <canvas class="brain3d" id="brain3d" aria-hidden="true" hidden></canvas>
     <div class="brain3d-hotspots" id="brain3d-hotspots" hidden></div>
-    <svg class="brain" id="brain" viewBox="0 0 1000 720" role="group" aria-labelledby="brain-title brain-desc">
+    <nav class="brain-poster-hotspots" aria-label="Brainhertz Productions brain map">
+      <a class="node brain-poster-node" href="#about" data-region="about" data-anchor="start" aria-label="About: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">About</span><span class="nl-sub">Frontal · identity</span></span></a>
+      <a class="node brain-poster-node" href="#plugins" data-region="plugins" data-anchor="middle" aria-label="Plugins: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Plugins</span><span class="nl-sub">Motor cortex · tools</span></span></a>
+      <a class="node brain-poster-node is-occluded" href="#live" data-region="live" data-anchor="start" aria-label="Live, Projection &amp; Lighting: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Live, Projection &amp; Lighting</span><span class="nl-sub">Parietal · space</span></span></a>
+      <a class="node brain-poster-node is-occluded" href="#work" data-region="work" data-anchor="middle" aria-label="Work: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Work</span><span class="nl-sub">Hippocampus · memory</span></span></a>
+      <a class="node brain-poster-node is-occluded" href="#visuals" data-region="visuals" data-anchor="end" aria-label="Visuals: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Visuals</span><span class="nl-sub">Occipital · sight</span></span></a>
+      <a class="node brain-poster-node" href="#sound" data-region="sound" data-anchor="end" aria-label="Music &amp; Sound: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Music &amp; Sound</span><span class="nl-sub">Temporal · hearing</span></span></a>
+      <a class="node brain-poster-node" href="#lab" data-region="lab" data-anchor="end" aria-label="Real-time Lab: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Real-time Lab</span><span class="nl-sub">Cerebellum · timing</span></span></a>
+      <a class="node brain-poster-node is-occluded" href="#contact" data-region="contact" data-anchor="start" aria-label="Contact: go to this section (focus or hover shows a preview)" aria-expanded="false" aria-controls="cell"><span class="node-ring" aria-hidden="true"></span><span class="node-label"><span class="nl-main">Contact</span><span class="nl-sub">Output</span></span></a>
+    </nav>
+    <svg class="brain" id="brain" viewBox="0 0 1000 720" aria-hidden="true">
       <title id="brain-title">Brainhertz Productions brain map</title>
       <desc id="brain-desc">A three-dimensional clear glass brain. This is the site map. Each labelled region shows a preview on hover and goes to that part of the site on click: About, Plugins, Visuals, Music and Sound, Live, Projection and Lighting, Real-time Lab, Work and Contact.</desc>
       <defs>
@@ -244,6 +264,7 @@
         </a>
       </g>
     </svg>
+    </div>
 
     <div class="hud" aria-hidden="true">
       <span class="hud-dot"></span>

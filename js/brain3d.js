@@ -4,8 +4,9 @@
    with Gray-Scott neon fluid on inset additive layers (transparent dark gaps).
    Shape is a baked SDF mesh (js/brain-mesh.bin, BHB2) — cartoon scalloped cerebrum, no stem.
    Optional per-vertex groove mask (flag byte 1) drives a neon/fresnel fold highlight.
-   three.js r158 is lazy-loaded from js/vendor/ (MIT, CSP script-src 'self') after first paint.
-   Fallback: the existing SVG glass brain, also used for prefers-reduced-motion and no-WebGL. */
+   three.js r158 is loaded from js/vendor/ (MIT, CSP script-src 'self') as soon as this module runs.
+   First paint is a static cartoon-brain poster (assets/brain-poster.*) that crossfades into the canvas.
+   Fallback (prefers-reduced-motion / no-WebGL): the same poster with HTML neuron hotspots. */
 (function () {
   'use strict';
 
@@ -29,7 +30,7 @@
   }
 
   var hero = document.getElementById('hero');
-  var wrap = hero && hero.querySelector('.brain-wrap');
+  var wrap = hero && (hero.querySelector('.brain-stage') || hero.querySelector('.brain-wrap'));
   var svg = document.getElementById('brain');
   var canvas = document.getElementById('brain3d');
   var hotspots = document.getElementById('brain3d-hotspots');
@@ -45,12 +46,6 @@
   if (!hasGL()) return;
 
   var booted = false, loading = false;
-
-  function afterPaint(fn) {
-    function go() { requestAnimationFrame(function () { requestAnimationFrame(fn); }); }
-    if (document.readyState === 'complete') go();
-    else window.addEventListener('load', go, { once: true });
-  }
 
   function heroOnScreen() { return hero && !hero.hidden; }
 
@@ -73,7 +68,7 @@
     });
   }
 
-  afterPaint(maybeLoad);
+  maybeLoad();
   document.addEventListener('bh:view', function () { if (heroOnScreen()) maybeLoad(); });
 
   // =====================================================================
@@ -786,13 +781,15 @@
       else stop();
     });
 
-    // show the 3D layer, keep the SVG for layout height + reduced-motion fallback
+    // Crossfade the live canvas over the first-paint poster (SVG stays hidden, used only by brain.js).
     canvas.hidden = false;
     hotspots.hidden = false;
     svg.setAttribute('aria-hidden', 'true');
-    hero.classList.add('has-brain3d');
-    document.documentElement.dataset.brain3d = 'on';
     setSize();
+    requestAnimationFrame(function () {
+      hero.classList.add('has-brain3d');
+      document.documentElement.dataset.brain3d = 'on';
+    });
     try {
       var gl = renderer.getContext();
       var ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -810,7 +807,11 @@
         renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '',
         vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : ''
       };
+    window.BH_brain3dHideMarkers = function (hide) {
+      markers.forEach(function (m) { if (m.group) m.group.visible = !hide; });
+    };
     window.BH_brain3dSetPose = function (y, x) {
+
       rotY = y;
       if (x != null && x === x) rotX = x;
       hoverLock = null;

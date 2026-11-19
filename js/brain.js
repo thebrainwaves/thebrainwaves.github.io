@@ -237,7 +237,7 @@
   });
 
   // ---------- the cell: look inside a neuron ----------
-  var wrap = svg.parentNode, cell = document.getElementById('cell'), body = document.getElementById('cell-body');
+  var wrap = document.querySelector('.brain-wrap') || svg.parentNode, cell = document.getElementById('cell'), body = document.getElementById('cell-body');
   var scrim = document.getElementById('cell-scrim'), dendG = document.getElementById('dendrites');
   var mobile = window.matchMedia('(max-width: 720px)'), finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
   var state = { open: false, region: null, pinned: false }, openT = 0, closeT = 0, hideT = 0, suppressFocus = false;
@@ -263,7 +263,8 @@
   }
 
   function nodeScreen(r) {
-    var n3 = document.querySelector('.hero.has-brain3d .brain3d-node[data-region="' + r + '"]');
+    var n3 = document.querySelector('.hero.has-brain3d .brain3d-node[data-region="' + r + '"]') ||
+      document.querySelector('.brain-poster-hotspots .node[data-region="' + r + '"]');
     if (n3) {
       var br = n3.getBoundingClientRect();
       return { x: br.left + br.width / 2, y: br.top + br.height / 2, rightBias: br.left + br.width / 2 < window.innerWidth * 0.58 };
@@ -370,6 +371,31 @@
       ev.preventDefault();
       clearTimeout(openT); clearTimeout(closeT);
       // the brain is the site map: a click travels straight to that region's view (hover still previews)
+      if (state.open) closeCell(false);
+      fireAndGo(r);
+    });
+  });
+
+  document.querySelectorAll('.brain-poster-hotspots .node').forEach(function (n) {
+    var r = n.dataset.region;
+    if (!r || !nodes[r]) return;
+    n.addEventListener('pointerenter', function (e) { window.BH_hoverEnter(r, e.pointerType); });
+    n.addEventListener('pointerleave', function () { window.BH_hoverLeave(); });
+    n.addEventListener('focus', function () {
+      hoverRegion = r; refreshHot();
+      if (!suppressFocus && n.matches(':focus-visible') && !(state.pinned && state.region !== r)) openCell(r, { pinned: false });
+    });
+    n.addEventListener('blur', function () {
+      hoverRegion = null; refreshHot();
+      setTimeout(function () {
+        var a = document.activeElement;
+        if (state.open && !state.pinned && !cell.contains(a) && !(a && a.classList && a.classList.contains('node'))) closeCell(false);
+      }, 0);
+    });
+    n.addEventListener('click', function (ev) {
+      if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button > 0) return;
+      ev.preventDefault();
+      clearTimeout(openT); clearTimeout(closeT);
       if (state.open) closeCell(false);
       fireAndGo(r);
     });
