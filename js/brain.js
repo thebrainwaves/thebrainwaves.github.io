@@ -262,12 +262,22 @@
     });
   }
 
-  function place(r) {
+  function nodeScreen(r) {
+    var n3 = document.querySelector('.hero.has-brain3d .brain3d-node[data-region="' + r + '"]');
+    if (n3) {
+      var br = n3.getBoundingClientRect();
+      return { x: br.left + br.width / 2, y: br.top + br.height / 2, rightBias: br.left + br.width / 2 < window.innerWidth * 0.58 };
+    }
     var N = nodes[r], m = svg.getScreenCTM(), pt = svg.createSVGPoint();
     pt.x = N.x; pt.y = N.y; var sp = pt.matrixTransform(m);
+    return { x: sp.x, y: sp.y, rightBias: N.x < 560 };
+  }
+
+  function place(r) {
+    var sp = nodeScreen(r);
     if (mobile.matches) { cell.style.left = cell.style.top = ''; cell.style.setProperty('--ox', '50%'); cell.style.setProperty('--oy', '100%'); return Math.PI / 2; }
     var wr = wrap.getBoundingClientRect(), W = cell.offsetWidth, H = cell.offsetHeight, gap = 38, vw = document.documentElement.clientWidth;
-    var right = N.x < 560;
+    var right = sp.rightBias;
     if (right && sp.x + gap + W > vw - 12) right = false;
     if (!right && sp.x - gap - W < 12) right = true;
     var left = right ? sp.x + gap : sp.x - gap - W;
@@ -295,7 +305,11 @@
       btn.addEventListener('click', function () { closeCell(false); fireAndGo(r); });
       act.appendChild(btn); body.appendChild(act);
       Array.prototype.forEach.call(body.children, function (c, i) { c.style.setProperty('--i', i); });
-      Object.keys(nodes).forEach(function (k) { nodes[k].el.setAttribute('aria-expanded', k === r ? 'true' : 'false'); nodes[k].el.classList.toggle('open', k === r); });
+      document.querySelectorAll('.node[data-region]').forEach(function (el) {
+        var on = el.dataset.region === r;
+        el.setAttribute('aria-expanded', on ? 'true' : 'false');
+        el.classList.toggle('open', on);
+      });
       cell.hidden = false; cell.classList.remove('open'); cell.dataset.region = r;
       var ang = place(r);
       dendG.style.setProperty('--rc-rgb', rgba(nodes[r].color, 1).replace(/rgba\((\d+),(\d+),(\d+),1\)/, '$1 $2 $3'));
@@ -313,26 +327,33 @@
     var r = state.region;
     state.open = false; state.pinned = false; state.region = null; cellRegion = null;
     cell.classList.remove('open'); scrim.classList.remove('on');
-    Object.keys(nodes).forEach(function (k) { nodes[k].el.setAttribute('aria-expanded', 'false'); nodes[k].el.classList.remove('open'); });
+    document.querySelectorAll('.node[data-region]').forEach(function (el) {
+      el.setAttribute('aria-expanded', 'false');
+      el.classList.remove('open');
+    });
     dendG.innerHTML = '';
     hideT = setTimeout(function () { if (!state.open) { cell.hidden = true; scrim.hidden = true; } }, reduce.matches ? 0 : 320);
     refreshHot();
     if (returnFocus && nodes[r]) { suppressFocus = true; nodes[r].el.focus({ preventScroll: true }); suppressFocus = false; }
   }
   window.BH_open = openCell; window.BH_close = closeCell;
+  window.BH_hoverEnter = function (r, pointerType) {
+    hoverRegion = r; refreshHot();
+    if ((pointerType == null || pointerType === 'mouse') && finePointer.matches && !(state.pinned && state.region !== r)) {
+      clearTimeout(openT); clearTimeout(closeT);
+      openT = setTimeout(function () { openCell(r, { pinned: false }); }, 90);
+    }
+  };
+  window.BH_hoverLeave = function () {
+    hoverRegion = null; refreshHot();
+    clearTimeout(openT);
+    if (state.open && !state.pinned) closeT = setTimeout(function () { closeCell(false); }, 260);
+  };
 
   Array.prototype.forEach.call(nodeEls, function (n) {
     var r = n.dataset.region;
-    n.addEventListener('pointerenter', function (e) {
-      hoverRegion = r; refreshHot();
-      if (e.pointerType === 'mouse' && finePointer.matches && !(state.pinned && state.region !== r)) {
-        clearTimeout(openT); clearTimeout(closeT); openT = setTimeout(function () { openCell(r, { pinned: false }); }, 90);
-      }
-    });
-    n.addEventListener('pointerleave', function () {
-      hoverRegion = null; refreshHot(); clearTimeout(openT);
-      if (state.open && !state.pinned) closeT = setTimeout(function () { closeCell(false); }, 260);
-    });
+    n.addEventListener('pointerenter', function (e) { window.BH_hoverEnter(r, e.pointerType); });
+    n.addEventListener('pointerleave', function () { window.BH_hoverLeave(); });
     n.addEventListener('focus', function () {
       hoverRegion = r; refreshHot();
       if (!suppressFocus && n.matches(':focus-visible') && !(state.pinned && state.region !== r)) openCell(r, { pinned: false });

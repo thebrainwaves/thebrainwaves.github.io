@@ -553,21 +553,34 @@
         if (window.BH_fireAndGo) window.BH_fireAndGo(m.region);
         else if (window.BH_go) window.BH_go(m.region);
       });
-      a.addEventListener('pointerenter', function () {
-        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.BH_open) {
+      a.addEventListener('pointerenter', function (ev) {
+        setHoverLock(m.region);
+        m.parked = true;
+        if (window.BH_hoverEnter) window.BH_hoverEnter(m.region, ev.pointerType);
+        else if (window.matchMedia('(hover: hover) and (pointer: fine)').matches && window.BH_open) {
           window.BH_open(m.region, { pinned: false });
         }
       });
       a.addEventListener('pointerleave', function () {
-        if (window.BH_close) window.BH_close(false);
+        clearHoverLock();
+        if (window.BH_hoverLeave) window.BH_hoverLeave();
       });
-      a.addEventListener('focus', function () { if (window.BH_open) window.BH_open(m.region, { pinned: false }); });
+      a.addEventListener('focus', function () {
+        setHoverLock(m.region);
+        if (window.BH_open) window.BH_open(m.region, { pinned: false });
+      });
     });
 
     // ---------- interaction ----------
     var rotY = 1.28, rotX = 0.14;
     var auto = 0, resumeAt = 0;
     var dragging = false, dragMoved = false, lastPX = 0, lastPY = 0, lastT = 0;
+    var hoverLock = null, hoverClearT = 0;
+    function setHoverLock(r) { clearTimeout(hoverClearT); hoverLock = r; }
+    function clearHoverLock() {
+      clearTimeout(hoverClearT);
+      hoverClearT = setTimeout(function () { hoverLock = null; }, 280);
+    }
     var parX = 0, parY = 0, tgtParX = 0, tgtParY = 0;
     var tiltOn = false, tiltX = 0, tiltY = 0;
     var world = new THREE.Vector3();
@@ -600,6 +613,7 @@
       dragging = true; dragMoved = false;
       lastPX = e.clientX; lastPY = e.clientY; lastT = performance.now();
       resumeAt = Infinity;
+      wrap.classList.add('is-dragging');
       try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
       enableTiltOnGesture();
     }
@@ -622,6 +636,7 @@
       if (!dragging) return;
       dragging = false;
       resumeAt = performance.now() + 1400;
+      wrap.classList.remove('is-dragging');
       try { wrap.releasePointerCapture(e.pointerId); } catch (err) {}
     }
     wrap.addEventListener('pointerdown', onDown);
@@ -655,18 +670,30 @@
       var w = canvas.clientWidth, h = canvas.clientHeight;
       group.updateWorldMatrix(true, true);
       markers.forEach(function (m) {
+        // Keep the hovered hotspot parked under the cursor so idle motion
+        // cannot flicker pointerenter/leave and restart the preview bubble.
+        if (hoverLock === m.region && m.parked) {
+          return;
+        }
         world.copy(m.local);
         group.localToWorld(world);
         v.copy(world).project(camera);
         var x = (v.x * 0.5 + 0.5) * w;
         var y = (-v.y * 0.5 + 0.5) * h;
-        // facing: world normal
         tmpN.set(m.nx, m.ny, m.nz).transformDirection(group.matrixWorld);
         var toCam = camera.position.clone().sub(world).normalize();
-        var front = tmpN.dot(toCam) > 0.02 && v.z < 1;
-        m.el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+        var face = tmpN.dot(toCam);
+        var wasFront = !m.el.classList.contains('is-back');
+        var front = (wasFront ? face > -0.10 : face > 0.12) && v.z < 1;
+        var tx = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+        if (m.el.style.transform !== tx) m.el.style.transform = tx;
         m.el.classList.toggle('is-back', !front);
         m.el.dataset.anchor = m.def.anchor;
+        var z = (front ? 240 : 40) + Math.round((1 - v.z) * 80);
+        if (hoverLock === m.region) z += 200;
+        m.el.style.zIndex = String(z);
+        if (hoverLock === m.region) m.parked = true;
+        else m.parked = false;
       });
     }
 
@@ -674,13 +701,17 @@
       raf = 0;
       var dt = Math.min(50, now - last) / 1000; last = now;
       if (home && visible && !document.hidden) {
-        if (now > resumeAt && !dragging) auto += dt;
+        if (now > resumeAt && !dragging && !hoverLock) auto += dt;
         else auto += dt * 0.15;
-        rotY += dt * 0.22 * (now > resumeAt && !dragging ? 1 : 0.2);
+        if (!hoverLock) {
+          rotY += dt * 0.22 * (now > resumeAt && !dragging ? 1 : 0.2);
+        }
         group.rotation.y = rotY + tiltY * 0.18;
         group.rotation.x = rotX + tiltX * 0.12;
-        parX += (tgtParX - parX) * 0.08;
-        parY += (tgtParY - parY) * 0.08;
+        if (!hoverLock) {
+          parX += (tgtParX - parX) * 0.08;
+          parY += (tgtParY - parY) * 0.08;
+        }
         camera.position.set(parX * 0.18, lookY + 0.28 - parY * 0.14, camDist);
         camera.lookAt(0, lookY, 0);
         var t = now * 0.001;

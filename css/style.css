@@ -300,9 +300,8 @@ h3{margin:0 0 10px;font-size:20px;letter-spacing:-.01em}
 @keyframes membrane{0%{width:0;height:0;opacity:1}100%{width:900px;height:900px;opacity:0}}
 .cell-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:1px solid rgb(var(--rc-rgb) / .3);background:rgba(4,5,12,.5);color:var(--ink);font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center}
 .cell-close:hover{border-color:var(--rc-text);color:var(--rc-text)}
-.cell-body>*{opacity:0;transform:translateY(8px)}
-.cell.open .cell-body>*{animation:cellIn .45s ease-out both;animation-delay:calc(var(--i,0) * 55ms + 160ms)}
-@keyframes cellIn{to{opacity:1;transform:none}}
+.cell-body>*{opacity:0;transform:translateY(8px);transition:opacity .32s ease,transform .32s ease}
+.cell.open .cell-body>*{opacity:1;transform:none;animation:none}
 .cell-lobe{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--rc-text);margin:0 0 4px}
 .cell h3{font-size:21px;margin:0 36px 10px 0}
 .cell p{margin:0 0 12px;color:#d4d0e2;font-size:14.5px;line-height:1.55}
@@ -931,15 +930,16 @@ html:not(.js) .mosh-demo{display:none}
 
 
 /* ---------- 3D glass brain (js/brain3d.js) + hero pop ---------- */
-.brain3d{position:absolute;left:0;top:0;width:100%;height:100%;display:block;z-index:2;touch-action:none;opacity:0;pointer-events:none;filter:none}
+.brain3d{position:absolute;left:0;top:0;width:100%;height:100%;display:block;z-index:2;touch-action:pan-y;opacity:0;pointer-events:none;filter:none}
 .hero.has-brain3d .brain3d{opacity:1;pointer-events:auto}
 .hero.has-brain3d #brain{opacity:0;pointer-events:none}
 .brain3d-hotspots{position:absolute;left:0;top:0;width:100%;height:100%;z-index:3;pointer-events:none}
-.brain3d-node{position:absolute;left:0;top:0;width:48px;height:48px;margin:-24px 0 0 -24px;pointer-events:auto;display:block;text-decoration:none;color:var(--ink)}
+.brain-wrap.is-dragging,.brain-wrap.is-dragging .brain3d,.brain-wrap.is-dragging .brain3d-node{touch-action:none}
+.brain3d-node{position:absolute;left:0;top:0;width:48px;height:48px;margin:-24px 0 0 -24px;pointer-events:auto;display:block;text-decoration:none;color:var(--ink);touch-action:pan-y;transition:none}
 .brain3d-node .node-ring{position:absolute;inset:10px;border-radius:50%;border:2px solid transparent}
-.brain3d-node .node-label{position:absolute;top:-6px;white-space:nowrap;font-size:14px;font-weight:750;letter-spacing:.01em;color:#f5f3fa;text-shadow:0 0 8px #04050c,0 1px 2px #04050c,0 0 0 #04050c;pointer-events:none;fill:none;stroke:none;paint-order:normal;background:none}
-.brain3d-node .nl-main{display:block}
-.brain3d-node .nl-sub{display:block;margin-top:2px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gd-l);font-weight:600}
+.brain3d-node .node-label{position:absolute;top:-6px;white-space:nowrap;font-size:14px;font-weight:750;letter-spacing:.01em;color:#f5f3fa;-webkit-text-fill-color:#f5f3fa;text-shadow:0 0 8px #04050c,0 1px 2px #04050c;pointer-events:none;fill:currentColor;stroke:none;paint-order:normal;background:none}
+.brain3d-node .nl-main{display:block;color:#f5f3fa;-webkit-text-fill-color:#f5f3fa;fill:currentColor}
+.brain3d-node .nl-sub{display:block;margin-top:2px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gd-l);-webkit-text-fill-color:var(--gd-l);fill:currentColor;font-weight:600}
 .brain3d-node[data-anchor="end"] .node-label{right:50px;text-align:right}
 .brain3d-node[data-anchor="start"] .node-label{left:50px;text-align:left}
 .brain3d-node[data-anchor="middle"] .node-label{left:50%;top:-10px;transform:translate(-50%,-100%);text-align:center}
@@ -961,4 +961,7 @@ html.rx-on .section.view.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){
   html.rx-on .section.view{opacity:1;transform:none;transition:none}
   .brain3d,.hero.has-brain3d .field{filter:none}
+  .cell,.cell.open{transition:none;clip-path:none}
+  .cell-body>*,.cell.open .cell-body>*{opacity:1;transform:none;animation:none}
 }
+
